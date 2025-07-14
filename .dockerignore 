@@ -1,0 +1,28 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+env/
+ENV/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# System files
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Data files (optional — if your model or data is large)
+data/
+models/*.joblib
+
+# OS files
+Thumbs.db
+ehthumbs.db
