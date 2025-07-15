@@ -9,14 +9,14 @@ import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Set up logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Set MLflow experiment name
-mlflow.set_experiment("exoplanet_baseline")
+# Set MLflow experiment
+EXPERIMENT_NAME = "exoplanet_baseline"
+mlflow.set_experiment(EXPERIMENT_NAME)
 
-# Create necessary directories
+# Ensure model output directory exists
 os.makedirs("models", exist_ok=True)
 
 # Load and clean dataset
@@ -30,48 +30,36 @@ df['koi_disposition'] = df['koi_disposition'].map({
 })
 df = df.select_dtypes(include='number').astype('float64')
 
-# Split data into features and target
+# Split features and target
 X = df.drop(columns=['koi_disposition'])
 y = df['koi_disposition']
 X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
 
 # Define model parameters
-param_grid = [
-    {"n_estimators": 100, "max_depth": 10},
-    {"n_estimators": 150, "max_depth": 15},
-    {"n_estimators": 200, "max_depth": None},
-]
+params = {
+    "n_estimators": 150,
+    "max_depth": 15,
+    "random_state": 42
+}
 
-for params in param_grid:
-    with mlflow.start_run():
-        clf = RandomForestClassifier(**params)
-        clf.fit(X_train, y_train)
-        y_pred = clf.predict(X_test)
-        acc = accuracy_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred, average='weighted')
-
-        mlflow.log_params(params)
-        mlflow.log_metrics({"accuracy": acc, "f1_score": f1})
-
-# Train Random Forest model
+# Train model
 clf = RandomForestClassifier(**params)
 clf.fit(X_train, y_train)
 
-# Generate predictions
+# Evaluate model
 y_pred = clf.predict(X_test)
-
-# Calculate evaluation metrics
 acc = accuracy_score(y_test, y_pred)
 f1 = f1_score(y_test, y_pred, average='weighted')
 
-# Start MLflow run
-with mlflow.start_run(run_name="baseline_rf_100trees") as run:
-    # Log hyperparameters and metrics
+# Log to MLflow
+with mlflow.start_run(run_name="baseline_rf_150trees") as run:
     mlflow.log_params(params)
     mlflow.log_metrics({"accuracy": acc, "f1_score": f1})
 
-    # Save and log model
+    # Save model locally
     joblib.dump(clf, "models/random_forest.joblib")
+
+    # Log model to MLflow
     mlflow.sklearn.log_model(
         sk_model=clf,
         artifact_path="model",
@@ -79,21 +67,22 @@ with mlflow.start_run(run_name="baseline_rf_100trees") as run:
         signature=infer_signature(X_train, clf.predict(X_train))
     )
 
-    # Log input sample
+    # Save and log a sample input for FastAPI
     X_train.sample(1, random_state=42).to_json("sample_input.json", orient="records", lines=False)
     mlflow.log_artifact("sample_input.json")
 
-    # Add tags
+    # Tag the run
     mlflow.set_tags({
         "stage": "baseline",
         "type": "RandomForest"
     })
 
-    # Register model
+    # Register the model
     model_uri = f"runs:/{run.info.run_id}/model"
     mlflow.register_model(model_uri=model_uri, name="RandomForestExoplanet")
 
-    # Call external script to register best model
-    os.system("python src/models/register_best_model.py")
+# Confirm success
+logging.info("Model trained, evaluated, logged, and registered.")
 
-logger.info("Model training, logging, and registration completed.")
+# Trigger the model selection script
+os.system("python src/models/register_best_model.py")
