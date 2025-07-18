@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Set MLflow tracking URI from environment or default fallback
-mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
 
 # Configure logging
 logging.basicConfig(
