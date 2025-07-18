@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import List, Dict
 import json
 from src.predict.predictor import ModelPredictor
+from src.serve.input_schema import InputData
+
 
 # Constants
 MODEL_PATH = "models/random_forest.joblib"
@@ -25,11 +25,6 @@ app = FastAPI(
     description="A simple API that uses a RandomForest model to predict exoplanets",
     version="1.0.0",
 )
-
-
-# Input schema
-class InputData(BaseModel):
-    input: List[Dict] = Field(..., json_schema_extra={"example": sample_input})
 
 
 # Root
