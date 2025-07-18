@@ -4,18 +4,12 @@ from src.predict.predictor import ModelPredictor
 
 SAMPLE_INPUT_PATH = "sample_input.json"
 MODEL_PATH = "models/random_forest.joblib"
+COLUMNS_PATH = "models/expected_columns.json"
 
 
 @pytest.fixture(scope="module")
-def expected_columns():
-    with open(SAMPLE_INPUT_PATH, "r") as f:
-        sample = json.load(f)
-    return list(sample[0].keys())
-
-
-@pytest.fixture(scope="module")
-def predictor(expected_columns):
-    return ModelPredictor(MODEL_PATH, expected_columns)
+def predictor():
+    return ModelPredictor(MODEL_PATH, columns_path=COLUMNS_PATH)
 
 
 @pytest.fixture

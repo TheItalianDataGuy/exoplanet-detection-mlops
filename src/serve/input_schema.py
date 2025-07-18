@@ -1,32 +1,24 @@
 from typing import List, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+import json
+import os
+
+
+def load_sample_input():
+    """Load a single-row example from sample_input.json for docs."""
+    try:
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+        sample_path = os.path.join(project_root, "sample_input.json")
+        with open(sample_path, "r") as f:
+            data = json.load(f)
+            return data[:1]
+    except Exception as e:
+        print(f"Failed to load sample input: {e}")
+        return [{"error": "Failed to load"}]
 
 
 class InputData(BaseModel):
-    input: List[Dict[str, float]] = Field(
-        ...,  # Required
-        example=[
-            {
-                "koi_fpflag_nt": 0,
-                "koi_fpflag_ss": 0,
-                "koi_fpflag_co": 0,
-                "koi_fpflag_ec": 0,
-                "koi_period": 41.07962,
-                "koi_time0bk": 133.5268,
-                "koi_impact": 0.25,
-                "koi_duration": 3.953,
-                "koi_depth": 693.1,
-                "koi_prad": 2.09,
-                "koi_teq": 755,
-                "koi_insol": 211,
-                "koi_model_snr": 13.5,
-                "koi_tce_plnt_num": 1,
-                "koi_steff": 5703,
-                "koi_slogg": 4.47,
-                "koi_srad": 0.89,
-                "ra": 294.3,
-                "dec": 46.0,
-                "koi_kepmag": 15.3,
-            }
-        ],
-    )
+    input: List[Dict[str, float]]
+    model_config = {"json_schema_extra": {"examples": [{"input": load_sample_input()}]}}

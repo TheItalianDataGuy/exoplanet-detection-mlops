@@ -9,13 +9,15 @@ class ModelPredictor:
         self, model_uri: str, columns_path: str = "models/expected_columns.json"
     ):
         """
-        model_uri: example -> 'models:/RandomForestExoplanet@production'
-        columns_path: path to the JSON file containing expected input column names
+        model_uri: Either a path to a local MLflow model directory or a registry URI like 'models:/ModelName@stage'
+        columns_path: Path to the expected columns JSON file
         """
-        # Load model from MLflow model registry
+        if not model_uri.startswith("models:/"):
+            # Load from local directory
+            if not os.path.exists(model_uri):
+                raise FileNotFoundError(f"Local model path does not exist: {model_uri}")
         self.model = mlflow.sklearn.load_model(model_uri)
 
-        # Load expected input columns from JSON file
         if not os.path.exists(columns_path):
             raise FileNotFoundError(
                 f"Expected columns file not found at {columns_path}"
@@ -23,7 +25,6 @@ class ModelPredictor:
         with open(columns_path, "r") as f:
             self.expected_columns = json.load(f)
 
-        # Map model output to human-readable labels
         self.label_map = {0: "FALSE POSITIVE", 1: "CANDIDATE", 2: "CONFIRMED"}
 
     def predict(self, input_data: list[dict]) -> dict:
