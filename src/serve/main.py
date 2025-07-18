@@ -26,14 +26,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
 # Input schema
 class InputData(BaseModel):
     input: List[Dict] = Field(..., json_schema_extra={"example": sample_input})
+
 
 # Root
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Exoplanet Detection API"}
+
 
 # Prediction endpoint
 @app.post("/predict")
