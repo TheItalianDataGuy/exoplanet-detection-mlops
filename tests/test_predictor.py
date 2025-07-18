@@ -1,5 +1,5 @@
 import pytest
-from predict.predictor import ModelPredictor
+from src.predict.predictor import ModelPredictor
 
 # Replace with the same expected columns used in your training pipeline
 EXPECTED_COLUMNS = ["feature1", "feature2", "feature3", "feature4"]
