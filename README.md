@@ -34,21 +34,22 @@ Classify whether a signal observed by the Kepler telescope corresponds to an **e
 
 ---
 
-## 🧪 Project Structure
+## 📁 Project Structure
 
 ```
-.
-├── data/                      # Data files
-├── models/                    # Saved models
-├── src/                       # Source code
-│   ├── train/                 # Training scripts
-│   ├── predict/               # Prediction logic
-│   └── serve/                 # FastAPI app
-├── tests/                     # Unit and integration tests
-├── .env.example               # Environment variable template
-├── Makefile                   # Command shortcuts
-├── requirements.txt           # Python dependencies
-└── README.md
+├── data/                          # Input dataset
+├── models/                        # Trained model artifacts
+├── notebooks/                     # EDA and exploration
+├── src/
+│   ├── features/                  # Feature engineering
+│   ├── models/                   # Training scripts
+│   ├── pipelines/                # (Optional) pipelines
+│   ├── predict/                  # Predictor logic
+│   └── serve/                    # FastAPI app
+├── tests/                         # Unit and integration tests
+├── .env.example                   # Template for environment variables
+├── Makefile                       # Make commands for reproducibility
+└── README.md                      # Project overview
 ```
 
 ---
@@ -83,34 +84,35 @@ cp .env.example .env
 
 ---
 
-## 🛠️ Usage
 
-### Train the model
+## 🧪 Makefile Commands
 
-```bash
-make train
-```
+You can use the `Makefile` to simplify common tasks:
 
-### Run the API locally
+| Command              | Description                            |
+|----------------------|----------------------------------------|
+| `make format`        | Format code with Black and Ruff        |
+| `make lint`          | Run linting checks                     |
+| `make test`          | Run unit and integration tests         |
+| `make run`           | Launch the FastAPI server locally      |
+| `make train`         | Train the baseline RandomForest model  |
+| `make register-best` | Register the best model to MLflow      |
 
-```bash
-make run
-```
+## 🌐 API Usage
 
-Visit: `http://127.0.0.1:8000/docs` to access Swagger UI.
+Once the app is running locally:
 
-### Run tests
-
-```bash
-make test
-```
-
-### Format and lint code
-
-```bash
-make format
-make lint
-```
+- Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Health Check:
+  ```bash
+  curl http://localhost:8000/
+  ```
+- Prediction:
+  ```bash
+  curl -X POST http://localhost:8000/predict \
+       -H "Content-Type: application/json" \
+       -d @sample_input.json
+  ```
 
 ---
 
@@ -147,11 +149,11 @@ POST `/predict`
 
 ## 🧑‍💻 Author
 
-Andrea — MSc Data Science Candidate & Aspiring MLOps Engineer  
+Andrea — MSc Data Science Student & Aspiring MLOps Engineer  
 Feel free to connect on [LinkedIn](https://www.https://www.linkedin.com/in/andrea-marella/) or check out my [GitHub](https://github.com/TheItalianDataGuy).
 
 ---
 
-## 📄 License
+## 🤝 License
 
-MIT License.
+This project is licensed under the MIT License.

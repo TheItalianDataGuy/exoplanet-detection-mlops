@@ -17,7 +17,7 @@ except Exception as e:
     raise RuntimeError(f"Failed to load sample input from {SAMPLE_PATH}: {e}")
 
 # Initialize model predictor (loaded once)
-model_predictor = ModelPredictor(MODEL_PATH, expected_columns)
+predictor = ModelPredictor("models:/RandomForestExoplanet@production")
 
 # FastAPI app
 app = FastAPI(
@@ -42,6 +42,6 @@ def read_root():
 @app.post("/predict")
 def predict(data: InputData):
     try:
-        return model_predictor.predict(data.input)
+        return predictor.predict(data.input)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Prediction failed: {str(e)}")
