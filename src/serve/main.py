@@ -1,27 +1,24 @@
 from fastapi import FastAPI, HTTPException, Body
-import json
 from src.predict.predictor import ModelPredictor
 from src.serve.input_schema import InputData
+import logging
 
-# Constants
-MODEL_PATH = "models/random_forest.joblib"
+# Configuration
+MODEL_URI = "models:/RandomForestExoplanet@production"
 COLUMNS_PATH = "models/expected_columns.json"
-SAMPLE_PATH = "sample_input.json"
 
-# Load example for docs
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+
+# Initialize the predictor
 try:
-    with open(SAMPLE_PATH, "r") as f:
-        sample_input = json.load(f)
-        example = {"input": sample_input[:1]}
+    predictor = ModelPredictor(model_uri=MODEL_URI, columns_path=COLUMNS_PATH)
+    logging.info("ModelPredictor initialized successfully.")
 except Exception as e:
-    print(f"Failed to load sample input: {e}")
-    example = {"input": [{"error": "failed to load"}]}
+    logging.error(f"Failed to initialize ModelPredictor: {e}")
+    raise RuntimeError("Failed to load model or expected columns.")
 
-# Initialize predictor
-predictor = ModelPredictor(
-    "models:/RandomForestExoplanet@production", columns_path=COLUMNS_PATH
-)
-
+# Create FastAPI app
 app = FastAPI(
     title="Exoplanet Detection API",
     description="A simple API that uses a RandomForest model to predict exoplanets",
@@ -29,19 +26,29 @@ app = FastAPI(
 )
 
 
+# Root endpoint
 @app.get("/")
 def read_root():
+    """Health check at the root"""
     return {"message": "Welcome to the Exoplanet Detection API"}
 
 
+# Prediction endpoint
 @app.post("/predict", response_model=dict)
-def predict(data: InputData = Body(..., example=example)):
+def predict(data: InputData = Body(...)):
+    """
+    Predicts exoplanet classification based on input features.
+    """
     try:
-        return predictor.predict(data.input)
+        result = predictor.predict(data.input)
+        return result
     except Exception as e:
+        logging.error(f"Prediction error: {e}")
         raise HTTPException(status_code=400, detail=f"Prediction failed: {str(e)}")
 
 
+# Health check endpoint
 @app.get("/health")
 def health_check():
+    """Simple health check"""
     return {"status": "ok"}

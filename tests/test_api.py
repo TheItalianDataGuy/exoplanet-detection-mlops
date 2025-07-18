@@ -1,12 +1,14 @@
 from fastapi.testclient import TestClient
 from src.serve.main import app
 
-
+# Initialize FastAPI test client
 client = TestClient(app)
 
 
-# Unit test: Check that /predict returns 200 OK with valid input
 def test_predict_valid_input():
+    """
+    Unit test: Ensure that /predict returns 200 OK and valid keys for proper input.
+    """
     import json
 
     with open("sample_input.json") as f:
@@ -18,14 +20,18 @@ def test_predict_valid_input():
     assert "labels" in response.json()
 
 
-# Unit test: Check that invalid input returns 422 Unprocessable Entity
 def test_predict_invalid_input():
+    """
+    Unit test: Ensure that invalid input returns a 422 Unprocessable Entity error.
+    """
     response = client.post("/predict", json={"not": "valid"})
     assert response.status_code == 422
 
 
-# Integration test: Load real sample input file and hit the endpoint
 def test_predict_sample_input_file():
+    """
+    Integration test: Send real sample input to the /predict endpoint and verify response.
+    """
     import json
 
     with open("sample_input.json") as f:
