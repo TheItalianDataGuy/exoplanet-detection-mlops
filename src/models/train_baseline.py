@@ -9,6 +9,13 @@ from sklearn.metrics import accuracy_score, f1_score
 import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Set MLflow tracking URI from environment or default fallback
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
 
 # Configure logging
 logging.basicConfig(
@@ -16,7 +23,7 @@ logging.basicConfig(
 )
 
 # Set experiment name in MLflow
-EXPERIMENT_NAME = "exoplanet_baseline"
+EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "exoplanet-detection")
 mlflow.set_experiment(EXPERIMENT_NAME)
 
 # Ensure local directory exists for model artifacts
