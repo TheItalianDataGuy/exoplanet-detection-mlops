@@ -1,4 +1,4 @@
-.PHONY: format lint test run
+.PHONY: format lint test run train register-best
 
 format:
 	black .
@@ -13,3 +13,6 @@ test:
 
 run:
 	uvicorn src.serve.main:app --reload
+
+train:
+	python src/train/train_baseline.py
