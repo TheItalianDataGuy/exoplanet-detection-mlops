@@ -1,23 +1,24 @@
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 from src.serve.main import app
+from src.predict.predictor import ModelPredictor
 
-# Initialize FastAPI test client
+# Use FastAPI test client with startup event
 client = TestClient(app)
 
 
-@patch("src.serve.main.model_predictor.predict")
+@patch.object(ModelPredictor, "predict")
 def test_predict_endpoint_with_mock(mock_predict):
     """
     Unit test: Mock the predictor to test the /predict endpoint independently of model logic.
     """
-    # Arrange: Mock return value for the predictor
+    # Arrange: Mock return value
     mock_predict.return_value = {
         "predictions": [1, 2],
         "labels": ["CANDIDATE", "CONFIRMED"],
     }
 
-    # Sample input matching expected FastAPI schema (features can be dummy keys here)
+    # Sample input (dummy features)
     request_payload = {
         "input": [
             {"feature1": 0.1, "feature2": 2.3, "feature3": 1.1, "feature4": 0.4},
@@ -25,13 +26,12 @@ def test_predict_endpoint_with_mock(mock_predict):
         ]
     }
 
-    # Act: Hit the /predict endpoint
+    # Act: call /predict
     response = client.post("/predict", json=request_payload)
 
-    # Assert: Validate response format and contents
+    # Assert: check status and content
     assert response.status_code == 200
-    response_json = response.json()
-    assert response_json == {
+    assert response.json() == {
         "predictions": [1, 2],
         "labels": ["CANDIDATE", "CONFIRMED"],
     }

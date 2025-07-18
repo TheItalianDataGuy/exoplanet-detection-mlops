@@ -1,24 +1,32 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException
 from src.predict.predictor import ModelPredictor
 from src.serve.input_schema import InputData
 import logging
+import os
 
-# Configuration
-MODEL_URI = "models:/RandomForestExoplanet@production"
+# Read environment setting (local or prod)
+ENV = os.getenv("ENV", "local")
+
+# Set model path depending on environment
+MODEL_URI = (
+    "models/random_forest.joblib"
+    if ENV == "local"
+    else "models:/RandomForestExoplanet@production"
+)
 COLUMNS_PATH = "models/expected_columns.json"
 
-# Initialize logging
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 
-# Initialize the predictor
+# Load model
 try:
     predictor = ModelPredictor(model_uri=MODEL_URI, columns_path=COLUMNS_PATH)
-    logging.info("ModelPredictor initialized successfully.")
+    logging.info(f"ModelPredictor initialized in '{ENV}' mode.")
 except Exception as e:
     logging.error(f"Failed to initialize ModelPredictor: {e}")
     raise RuntimeError("Failed to load model or expected columns.")
 
-# Create FastAPI app
+# Initialize FastAPI app
 app = FastAPI(
     title="Exoplanet Detection API",
     description="A simple API that uses a RandomForest model to predict exoplanets",
@@ -29,16 +37,12 @@ app = FastAPI(
 # Root endpoint
 @app.get("/")
 def read_root():
-    """Health check at the root"""
     return {"message": "Welcome to the Exoplanet Detection API"}
 
 
 # Prediction endpoint
 @app.post("/predict", response_model=dict)
-def predict(data: InputData = Body(...)):
-    """
-    Predicts exoplanet classification based on input features.
-    """
+def predict(data: InputData):
     try:
         result = predictor.predict(data.input)
         return result
@@ -50,5 +54,4 @@ def predict(data: InputData = Body(...)):
 # Health check endpoint
 @app.get("/health")
 def health_check():
-    """Simple health check"""
     return {"status": "ok"}

@@ -1,11 +1,11 @@
 import json
 import os
 import pytest
-
 from src.predict.predictor import ModelPredictor
 
 # Paths to model and sample input
 MODEL_PATH = "models/random_forest.joblib"
+COLUMNS_PATH = "models/expected_columns.json"
 SAMPLE_INPUT_PATH = "sample_input.json"
 
 # Mark these tests as integration tests (can be run selectively with `-m integration`)
@@ -22,20 +22,13 @@ def sample_input():
 
 
 @pytest.fixture(scope="module")
-def expected_columns(sample_input):
+def predictor():
     """
-    Infer expected column names from the sample input.
-    """
-    return list(sample_input[0].keys())
-
-
-@pytest.fixture(scope="module")
-def predictor(expected_columns):
-    """
-    Load the model and initialize the predictor with expected column names.
+    Load the model and initialize the predictor with expected columns file path.
     """
     assert os.path.exists(MODEL_PATH), f"Model file not found at: {MODEL_PATH}"
-    return ModelPredictor(MODEL_PATH, expected_columns)
+    assert os.path.exists(COLUMNS_PATH), f"Columns file not found at: {COLUMNS_PATH}"
+    return ModelPredictor(MODEL_PATH, COLUMNS_PATH)
 
 
 def test_predictor_with_real_model(sample_input, predictor):
