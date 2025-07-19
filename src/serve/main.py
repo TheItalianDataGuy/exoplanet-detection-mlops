@@ -1,33 +1,47 @@
-import os
 import logging
 from fastapi import FastAPI, HTTPException, Depends
+
 from src.predict.predictor import ModelPredictor
 from src.serve.input_schema import InputData
+from config.settings import settings
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-
-# Determine environment from ENV variable, default 'local'
-ENV = os.getenv("ENV", "local")
+# Configure logging: uniform format for all log messages
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 def get_model_uri(env: str) -> str:
     """
-    Determine model URI based on environment.
+    Resolve the model URI depending on the execution environment.
+
+    Args:
+        env (str): Environment type (e.g. 'local', 'prod', 'staging').
+
+    Returns:
+        str: Path or URI to the trained model artifact.
     """
     if env == "local":
-        return "models/random_forest.joblib"
-    else:
+        return settings.model_path
+    elif env == "prod":
         return "models:/RandomForestExoplanet@production"
+    elif env == "staging":
+        return "models:/RandomForestExoplanet@staging"
+    else:
+        raise ValueError(f"Unsupported ENV: {env}")
 
 
-# Load model once at module load time
-MODEL_URI = get_model_uri(ENV)
-COLUMNS_PATH = "models/expected_columns.json"
+# Initialize paths to model and expected columns
+model_uri = get_model_uri(settings.env)
+columns_path = settings.model_path.replace(
+    "random_forest.joblib", "expected_columns.json"
+)
 
+# Load model and expected input schema
 try:
-    predictor = ModelPredictor(model_uri=MODEL_URI, columns_path=COLUMNS_PATH)
-    logging.info(f"ModelPredictor initialized with model_uri='{MODEL_URI}'")
+    predictor = ModelPredictor(model_uri=model_uri, columns_path=columns_path)
+    logging.info(f"ModelPredictor initialized with model_uri='{model_uri}'")
 except Exception as e:
     logging.error(f"Failed to initialize ModelPredictor: {e}")
     raise RuntimeError("Failed to load model or expected columns.")
@@ -35,14 +49,17 @@ except Exception as e:
 
 def get_predictor() -> ModelPredictor:
     """
-    Dependency that returns the already loaded ModelPredictor instance.
+    FastAPI dependency injection for the shared ModelPredictor instance.
+
+    Returns:
+        ModelPredictor: The loaded and validated model instance.
     """
     return predictor
 
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Exoplanet Detection API",
+    title="🪐 Exoplanet Detection API",
     description="API to predict exoplanets using a RandomForest model",
     version="1.0.0",
 )
@@ -51,7 +68,7 @@ app = FastAPI(
 @app.get("/")
 def read_root():
     """
-    Root endpoint returning a welcome message.
+    Root endpoint for connectivity check.
     """
     return {"message": "Welcome to the Exoplanet Detection API"}
 
@@ -59,11 +76,17 @@ def read_root():
 @app.post("/predict", response_model=dict)
 def predict(data: InputData, predictor: ModelPredictor = Depends(get_predictor)):
     """
-    Prediction endpoint using the shared ModelPredictor instance.
+    Predict the presence of an exoplanet given the input features.
+
+    Args:
+        data (InputData): Features in the correct format for prediction.
+        predictor (ModelPredictor): Injected instance of the predictor.
+
+    Returns:
+        dict: Prediction result.
     """
     try:
-        result = predictor.predict(data.input)
-        return result
+        return predictor.predict(data.input)
     except Exception as e:
         logging.error(f"Prediction error: {e}")
         raise HTTPException(status_code=400, detail=f"Prediction failed: {str(e)}")
@@ -72,7 +95,10 @@ def predict(data: InputData, predictor: ModelPredictor = Depends(get_predictor))
 @app.get("/health")
 def health_check():
     """
-    Health check endpoint.
+    Health check endpoint to confirm service availability.
+
+    Returns:
+        dict: Status OK.
     """
     return {"status": "ok"}
 
@@ -80,4 +106,4 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=9696)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
