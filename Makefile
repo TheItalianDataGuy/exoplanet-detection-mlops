@@ -1,4 +1,4 @@
-.PHONY: format lint test run train register-best
+.PHONY: format lint test run train register-best run-airflow start-dag stop-dag mlflow-ui
 
 # Format code using Black and Ruff
 format:
@@ -38,3 +38,36 @@ mlflow-ui:
 		--default-artifact-root ./mlflow/mlruns \
 		--host 0.0.0.0 \
 		--port 5001
+
+# Start Airflow Web Server
+start-airflow-web:
+	airflow webserver --port 8080
+
+# Start Airflow Scheduler
+start-airflow-scheduler:
+	airflow scheduler
+
+# Initialize Airflow Database (first-time setup)
+airflow-init:
+	airflow db init
+
+# Trigger the ML pipeline DAG manually
+trigger-ml-pipeline:
+	airflow dags trigger ml_pipeline_dag
+
+# List all running DAGs in Airflow
+list-dags:
+	airflow dags list
+
+# Start Airflow Web Server and Scheduler (combined)
+start-airflow:
+	@echo "Starting Airflow web server and scheduler..."
+	airflow webserver --port 8080 &
+	airflow scheduler &
+
+# Stop Airflow services
+stop-airflow:
+	@echo "Stopping Airflow..."
+	kill $(lsof -t -i:8080) # Kill the webserver
+	kill $(lsof -t -i:8793) # Kill the scheduler
+

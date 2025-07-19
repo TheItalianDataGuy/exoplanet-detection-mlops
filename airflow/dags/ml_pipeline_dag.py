@@ -1,30 +1,28 @@
-import json
+from pathlib import Path
 from airflow.decorators import task, dag
 from datetime import timedelta, datetime
-import subprocess
 import logging
-
 from sklearn.model_selection import train_test_split
 from config.settings import settings
-from airflow.providers.smtp.operators.email import EmailOperator  # type: ignore
-from airflow.models import Variable
-from pathlib import Path
 import joblib
 import pandas as pd
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    confusion_matrix,
-    classification_report,
+from src.models.train_baseline import (
+    load_data,
+    train_model,
+    evaluate_model,
+    save_metrics,
+    save_artifacts,
+    register_model_with_alias,
 )
+from airflow.operators.email import EmailOperator
+from airflow.models import Variable
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants from settings
-TRAIN_SCRIPT = settings.train_script_path
-REGISTER_SCRIPT = settings.register_script_path
+# Constants from settings (now correctly as Path objects)
 EVALUATION_METRICS_PATH = settings.metrics_path
 SUCCESS_THRESHOLD = settings.success_threshold
 
@@ -68,27 +66,11 @@ default_args = {
 def ml_pipeline():
 
     @task()
-    def load_data() -> pd.DataFrame:
-        """Load data from source."""
-        logger.info("Loading data from source.")
+    def load_and_preprocess_data() -> pd.DataFrame:
+        """Load and preprocess the data."""
+        logger.info("Loading data and preprocessing.")
         data_path = settings.data_path
-        df = pd.read_csv(data_path)
-
-        # Preprocessing steps
-        drop_cols = ["rowid", "kepid", "kepoi_name", "kepler_name", "koi_pdisposition"]
-        df.drop(columns=drop_cols, errors="ignore", inplace=True)
-
-        error_cols = [col for col in df.columns if "_err1" in col or "_err2" in col]
-        df.drop(columns=error_cols, inplace=True)
-
-        # Encode the target labels
-        disposition_map = {"FALSE POSITIVE": 0, "CANDIDATE": 1, "CONFIRMED": 2}
-        df["koi_disposition"] = df["koi_disposition"].map(disposition_map)
-
-        df = df.select_dtypes(include="number").astype("float64")
-        df.drop(columns=["koi_score"], errors="ignore", inplace=True)
-
-        return df
+        return load_data(data_path)
 
     @task()
     def split_data(df: pd.DataFrame) -> tuple:
@@ -101,102 +83,62 @@ def ml_pipeline():
         return X_train, X_test, y_train, y_test
 
     @task()
-    def train_model(X_train: pd.DataFrame, y_train: pd.Series) -> str:
-        """Train the model using the provided data."""
-        logger.info("Training model using data.")
-        try:
-            # Run the training script
-            subprocess.run(["python", TRAIN_SCRIPT], check=True)
-
-            # Save the model path dynamically based on settings
-            model_save_dir = Path(settings.model_save_dir)
-            model_save_dir.mkdir(
-                parents=True, exist_ok=True
-            )  # Ensure the directory exists
-            model_save_path = model_save_dir / "random_forest.joblib"
-            logger.info(f"Model saved to: {model_save_path}")
-
-            return str(model_save_path)  # Return the full path of the saved model
-        except subprocess.CalledProcessError as e:
-            logger.error("Training failed.", exc_info=True)
-            raise e
+    def train_and_save_model(X_train: pd.DataFrame, y_train: pd.Series) -> Path:
+        """Train the model and save it."""
+        logger.info("Training and saving model.")
+        rf_params = {"n_estimators": 150, "max_depth": 15, "random_state": 42}
+        clf, model_save_path = train_model(X_train, y_train, rf_params)
+        return model_save_path  # Now returning Path instead of str
 
     @task()
-    def evaluate_model(
-        model_path: str, X_test: pd.DataFrame, y_test: pd.Series
+    def evaluate_and_save_metrics(
+        model_path: Path, X_test: pd.DataFrame, y_test: pd.Series
     ) -> bool:
-        """Evaluate the model's performance."""
-        logger.info(f"Evaluating model at {model_path}.")
-        try:
-            model = joblib.load(model_path)  # Load the trained model
-            logger.info(f"Model loaded successfully from {model_path}")
+        """Evaluate the model and save metrics."""
+        logger.info("Evaluating model.")
+        # Load the model from the saved path
+        model = joblib.load(model_path)
 
-            y_pred = model.predict(X_test)
+        # Call evaluate_model with the model object
+        metrics = evaluate_model(model, X_test, y_test)
+        save_metrics(metrics, settings.metrics_path)
 
-            # Calculate evaluation metrics
-            accuracy = accuracy_score(y_test, y_pred)
-            f1 = f1_score(y_test, y_pred, average="weighted")
-            conf_matrix = confusion_matrix(y_test, y_pred)
-            class_report = classification_report(y_test, y_pred)
-
-            # Log the evaluation metrics
-            logger.info(f"Accuracy: {accuracy}")
-            logger.info(f"F1 Score: {f1}")
-            logger.info(f"Confusion Matrix: \n{conf_matrix}")
-            logger.info(f"Classification Report: \n{class_report}")
-
-            # Save metrics to a JSON file
-            metrics = {
-                "accuracy": accuracy,
-                "f1_score": f1,
-                "confusion_matrix": conf_matrix.tolist(),
-                "classification_report": class_report,
-            }
-            save_metrics(metrics, settings.metrics_path)
-
-            if accuracy >= SUCCESS_THRESHOLD:
-                logger.info("Model evaluation passed.")
-                return True
-            else:
-                logger.warning("Model evaluation failed: Accuracy below threshold.")
-                return False
-
-        except Exception as e:
-            logger.error("Failed to evaluate model.", exc_info=True)
-            raise e
+        if metrics["accuracy"] >= SUCCESS_THRESHOLD:
+            logger.info("Model evaluation passed.")
+            return True
+        else:
+            logger.warning("Model evaluation failed: Accuracy below threshold.")
+            return False
 
     @task()
-    def register_model(evaluation_passed: bool) -> None:
+    def save_artifacts_to_disk(X_train: pd.DataFrame, model_path: Path) -> None:
+        """Save artifacts like expected columns and sample input."""
+        # Use Path for expected_cols_path from settings.py
+        expected_cols_path = settings.expected_cols_path
+
+        # Call save_artifacts from train_baseline.py with the correct arguments
+        save_artifacts(
+            X_train, model_path, expected_cols_path
+        )  # Now passing Path objects
+
+    @task()
+    def register_model(evaluation_passed: bool, model_path: Path) -> None:
         """Register the model if evaluation passes."""
         if not evaluation_passed:
             logger.error("Evaluation failed, not registering model.")
             raise ValueError("Model evaluation failed.")
 
         logger.info("Registering the model.")
-        try:
-            subprocess.run(["python", REGISTER_SCRIPT], check=True)
-        except subprocess.CalledProcessError as e:
-            logger.error("Registration failed.", exc_info=True)
-            raise e
-
-    @task()
-    def save_metrics(metrics: dict, metrics_path: str):
-        """Save the model evaluation metrics to a file."""
-        try:
-            Path(metrics_path).parent.mkdir(parents=True, exist_ok=True)
-            with open(metrics_path, "w") as f:
-                json.dump(metrics, f)
-            logger.info(f"Metrics saved to: {metrics_path}")
-        except Exception as e:
-            logger.error(f"Error saving metrics: {e}", exc_info=True)
-            raise
+        model_uri = f"file://{model_path}"  # Change as necessary
+        register_model_with_alias(model_uri, "RandomForestExoplanet")
 
     # Define task dependencies
-    df = load_data()
+    df = load_and_preprocess_data()
     X_train, X_test, y_train, y_test = split_data(df)  # type: ignore
-    model_path = train_model(X_train, y_train)
-    eval_result = evaluate_model(model_path, X_test, y_test)  # type: ignore
-    register_model(eval_result)  # type: ignore
+    model_path = train_and_save_model(X_train, y_train)  # type: ignore
+    eval_result = evaluate_and_save_metrics(model_path, X_test, y_test)  # type: ignore
+    save_artifacts_to_disk(X_train, model_path)  # type: ignore
+    register_model(eval_result, model_path)  # type: ignore
 
 
 # Instantiate the DAG

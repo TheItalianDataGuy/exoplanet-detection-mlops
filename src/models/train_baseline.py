@@ -30,7 +30,7 @@ def configure_logging() -> None:
     )
 
 
-def load_data(data_path: str) -> pd.DataFrame:
+def load_data(data_path: Path) -> pd.DataFrame:
     """
     Load and preprocess the Kepler exoplanet dataset.
 
@@ -129,7 +129,7 @@ def evaluate_model(
         raise
 
 
-def save_metrics(metrics: dict, metrics_path: str):
+def save_metrics(metrics: dict, metrics_path: Path):
     """
     Save the model evaluation metrics to a file.
 
@@ -219,7 +219,7 @@ def main():
         logger.info(f"MLflow Experiment set to: {settings.mlflow_experiment_name}")
 
         # Load and preprocess data
-        data_path = settings.data_path  # Path from settings
+        data_path = settings.data_path
         df = load_data(data_path)
         logger.info(f"Data loaded and preprocessed with shape: {df.shape}")
 

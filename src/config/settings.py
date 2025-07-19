@@ -30,16 +30,19 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
     # Data paths
-    data_path: str = "data/kepler_exoplanet_data.csv"
+    data_path: Path = Path("/data/kepler_exoplanet_data.csv")
 
     # Metrics paths
-    metrics_path: str = "models/metrics.json"
+    metrics_path: Path = Path("models/metrics.json")
 
     # Model save directory (added type annotation)
     model_save_dir: Path = Path("models")
 
     # Success threshold for model evaluation
     success_threshold: float = 0.85
+
+    # Expected columns for the model
+    expected_cols_path: Path = Path("models/expected_columns.json")
 
 
 # Singleton instance to import across the app

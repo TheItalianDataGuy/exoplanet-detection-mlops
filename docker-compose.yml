@@ -1,0 +1,19 @@
+services:
+  # Single service running FastAPI, MLflow, and Airflow
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile  # Use the Dockerfile you created
+    ports:
+      - "8000:8000"  # Exposing FastAPI on port 8000
+      - "5001:5001"  # Exposing MLflow UI on port 5001
+      - "8080:8080"  # Exposing Airflow Web UI on port 8080
+    volumes:
+      - ./dags:/opt/airflow/dags  # Mount Airflow DAGs
+      - ./mlruns:/opt/airflow/mlruns  # Mount MLflow directory
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
