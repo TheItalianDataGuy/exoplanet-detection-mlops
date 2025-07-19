@@ -1,7 +1,7 @@
-import os
 import logging
 from mlflow.tracking import MlflowClient
 from dotenv import load_dotenv
+from config.settings import settings
 
 # Load environment variables from .env
 load_dotenv()
@@ -12,9 +12,9 @@ logging.basicConfig(
 )
 
 # Load values from .env
-EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "exoplanet_baseline")
-MODEL_NAME = os.getenv("MODEL_NAME", "RandomForestExoplanet")
-PRIMARY_METRIC = os.getenv("PRIMARY_METRIC", "f1_score")
+EXPERIMENT_NAME = settings.mlflow_experiment_name
+MODEL_NAME = settings.model_name
+PRIMARY_METRIC = settings.primary_metric
 
 # MLflow setup
 client = MlflowClient()

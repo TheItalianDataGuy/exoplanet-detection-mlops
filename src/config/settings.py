@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Load from .env automatically
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
+    # Configuration variables
+    model_name: str = "RandomForestExoplanet"
+    primary_metric: str = "f1_score"
+
     # Python path for module imports
     pythonpath: str = "src"
 

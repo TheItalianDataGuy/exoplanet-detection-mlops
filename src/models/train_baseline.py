@@ -1,19 +1,25 @@
-import os
 import json
 import logging
 from pathlib import Path
-
 import pandas as pd
 import joblib
 from dotenv import load_dotenv
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score
-
 import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature
-from mlflow import MlflowClient
+from mlflow.tracking.client import MlflowClient
+from config.settings import settings
+
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def configure_logging() -> None:
@@ -34,27 +40,31 @@ def load_data(data_path: str) -> pd.DataFrame:
     Returns:
         Preprocessed pandas DataFrame.
     """
-    df = pd.read_csv(data_path)
+    try:
+        df = pd.read_csv(data_path)
 
-    # Drop irrelevant columns that do not contribute to the model
-    drop_cols = ["rowid", "kepid", "kepoi_name", "kepler_name", "koi_pdisposition"]
-    df.drop(columns=drop_cols, errors="ignore", inplace=True)
+        # Drop irrelevant columns that do not contribute to the model
+        drop_cols = ["rowid", "kepid", "kepoi_name", "kepler_name", "koi_pdisposition"]
+        df.drop(columns=drop_cols, errors="ignore", inplace=True)
 
-    # Remove error-related columns
-    error_cols = [col for col in df.columns if "_err1" in col or "_err2" in col]
-    df.drop(columns=error_cols, inplace=True)
+        # Remove error-related columns
+        error_cols = [col for col in df.columns if "_err1" in col or "_err2" in col]
+        df.drop(columns=error_cols, inplace=True)
 
-    # Encode target labels numerically
-    disposition_map = {"FALSE POSITIVE": 0, "CANDIDATE": 1, "CONFIRMED": 2}
-    df["koi_disposition"] = df["koi_disposition"].map(disposition_map)
+        # Encode target labels numerically
+        disposition_map = {"FALSE POSITIVE": 0, "CANDIDATE": 1, "CONFIRMED": 2}
+        df["koi_disposition"] = df["koi_disposition"].map(disposition_map)
 
-    # Retain only numeric columns for model input
-    df = df.select_dtypes(include="number").astype("float64")
+        # Retain only numeric columns for model input
+        df = df.select_dtypes(include="number").astype("float64")
 
-    # Remove potential data leakage columns
-    df.drop(columns=["koi_score"], errors="ignore", inplace=True)
+        # Remove potential data leakage columns
+        df.drop(columns=["koi_score"], errors="ignore", inplace=True)
 
-    return df
+        return df
+    except Exception as e:
+        logger.error(f"Error in load_data: {e}", exc_info=True)
+        raise
 
 
 def train_model(
@@ -71,9 +81,13 @@ def train_model(
     Returns:
         Trained RandomForestClassifier instance.
     """
-    clf = RandomForestClassifier(**params)
-    clf.fit(X_train, y_train)
-    return clf
+    try:
+        clf = RandomForestClassifier(**params)
+        clf.fit(X_train, y_train)
+        return clf
+    except Exception as e:
+        logger.error(f"Error during model training: {e}", exc_info=True)
+        raise
 
 
 def evaluate_model(
@@ -90,14 +104,22 @@ def evaluate_model(
     Returns:
         Dictionary with accuracy and weighted F1-score.
     """
-    y_pred = clf.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred, average="weighted")
-    return {"accuracy": accuracy, "f1_score": f1}
+    try:
+        y_pred = clf.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred, average="weighted")
+        logger.info(f"Accuracy: {accuracy}, F1 Score: {f1}")
+        return {"accuracy": accuracy, "f1_score": f1}
+    except Exception as e:
+        logger.error(f"Error during model evaluation: {e}", exc_info=True)
+        raise
 
 
 def save_artifacts(
-    X_train: pd.DataFrame, model_path: Path, expected_cols_path: Path
+    X_train: pd.DataFrame,
+    model_path: Path,
+    expected_cols_path: Path,
+    artifact_dir: Path = "models/",
 ) -> None:
     """
     Save expected columns and sample input for downstream validation and FastAPI documentation.
@@ -107,20 +129,26 @@ def save_artifacts(
         model_path: Path where the trained model will be saved.
         expected_cols_path: Path to save the expected input columns JSON.
     """
-    # Save expected input columns to the models/ directory
-    expected_cols_path.parent.mkdir(parents=True, exist_ok=True)
-    with expected_cols_path.open("w") as f:
-        json.dump(X_train.columns.tolist(), f)
-    logging.info(f"Expected columns saved to: {expected_cols_path}")
+    try:
+        # Save expected input columns to the models/ directory
+        expected_cols_path = artifact_dir / expected_cols_path
+        expected_cols_path.parent.mkdir(parents=True, exist_ok=True)
+        with expected_cols_path.open("w") as f:
+            json.dump(X_train.columns.tolist(), f)
+        logger.info(f"Expected columns saved to: {expected_cols_path}")
 
-    # Save sample input to the root directory for FastAPI documentation
-    sample_input_path = Path("sample_input.json")
-    X_train.sample(1, random_state=42).to_json(sample_input_path, orient="records")
-    logging.info(f"Sample input saved to: {sample_input_path}")
+        # Save sample input to the root directory for FastAPI documentation
+        artifact_dir = Path("models")
+        sample_input_path = artifact_dir / "sample_input.json"
+        X_train.sample(1, random_state=42).to_json(sample_input_path, orient="records")
+        logger.info(f"Sample input saved to: {sample_input_path}")
 
-    # Log both artifacts to MLflow
-    mlflow.log_artifact(str(expected_cols_path))
-    mlflow.log_artifact(str(sample_input_path))
+        # Log both artifacts to MLflow
+        mlflow.log_artifact(str(expected_cols_path))
+        mlflow.log_artifact(str(sample_input_path))
+    except Exception as e:
+        logger.error(f"Error saving artifacts: {e}", exc_info=True)
+        raise
 
 
 def register_model_with_alias(model_uri: str, model_name: str):
@@ -131,15 +159,19 @@ def register_model_with_alias(model_uri: str, model_name: str):
         model_uri (str): URI of the logged model (e.g., "runs:/<run_id>/model").
         model_name (str): Name to register the model under.
     """
-    client = MlflowClient()
+    try:
+        client = MlflowClient()
 
-    # Register the model (creates a new version under the given name)
-    result = mlflow.register_model(model_uri=model_uri, name=model_name)
+        # Register the model (creates a new version under the given name)
+        result = mlflow.register_model(model_uri=model_uri, name=model_name)
 
-    # Optional: Set an alias (e.g., 'production')
-    client.set_registered_model_alias(
-        name=model_name, alias="production", version=result.version
-    )
+        # Optional: Set an alias (e.g., 'production')
+        client.set_registered_model_alias(
+            name=model_name, alias="production", version=result.version
+        )
+    except Exception as e:
+        logger.error(f"Error during model registration: {e}", exc_info=True)
+        raise
 
 
 def main():
@@ -148,17 +180,15 @@ def main():
 
     try:
         # Set MLflow tracking URI and experiment
-        mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
-        mlflow.set_tracking_uri(mlflow_tracking_uri)
-        experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "exoplanet-detection")
-        mlflow.set_experiment(experiment_name)
-        logging.info(f"MLflow tracking URI set to: {mlflow_tracking_uri}")
-        logging.info(f"MLflow experiment set to: {experiment_name}")
+        mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+        mlflow.set_experiment(settings.mlflow_experiment_name)
+        logger.info(f"MLflow Tracking URI set to: {settings.mlflow_tracking_uri}")
+        logger.info(f"MLflow Experiment set to: {settings.mlflow_experiment_name}")
 
         # Load and preprocess data
         data_path = "data/kepler_exoplanet_data.csv"
         df = load_data(data_path)
-        logging.info(f"Data loaded and preprocessed with shape: {df.shape}")
+        logger.info(f"Data loaded and preprocessed with shape: {df.shape}")
 
         # Prepare features and labels
         X = df.drop(columns=["koi_disposition"])
@@ -168,7 +198,7 @@ def main():
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, stratify=y, random_state=42
         )
-        logging.info(
+        logger.info(
             f"Train/test split completed: {X_train.shape[0]} train, {X_test.shape[0]} test"
         )
 
@@ -178,12 +208,12 @@ def main():
 
         # Evaluate model
         metrics = evaluate_model(clf, X_test, y_test)
-        logging.info(f"Model evaluation metrics: {metrics}")
+        logger.info(f"Model evaluation metrics: {metrics}")
 
         # Save model locally
         model_save_path = Path("models/random_forest.joblib")
         joblib.dump(clf, model_save_path)
-        logging.info(f"Trained model saved to: {model_save_path}")
+        logger.info(f"Trained model saved to: {model_save_path}")
 
         # Log to MLflow
         with mlflow.start_run(run_name="baseline_rf_150trees") as run:
@@ -206,10 +236,10 @@ def main():
                 model_uri=model_uri, model_name="RandomForestExoplanet"
             )
 
-        logging.info("Training, logging, and registration complete.")
+        logger.info("Training, logging, and registration complete.")
 
     except Exception:
-        logging.error("An error occurred during training or logging", exc_info=True)
+        logger.error("An error occurred during training or logging", exc_info=True)
 
 
 if __name__ == "__main__":
