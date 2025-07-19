@@ -44,6 +44,24 @@ class Settings(BaseSettings):
     # Expected columns for the model
     expected_cols_path: Path = Path("models/expected_columns.json")
 
+    # Additional model path for training
+    model_path: Path = Path("models/random_forest.joblib")
+
+    def __init__(self, **kwargs):
+        """Initialize settings with environment-specific configurations."""
+        super().__init__(**kwargs)
+
+        # Set environment-specific paths and MLflow URIs
+        if self.env == "prod":
+            self.mlflow_tracking_uri = "https://prod.mlflow.server"
+            self.data_path = Path("/prod/data/kepler_exoplanet_data.csv")
+        elif self.env == "staging":
+            self.mlflow_tracking_uri = "https://staging.mlflow.server"
+            self.data_path = Path("/staging/data/kepler_exoplanet_data.csv")
+        else:
+            self.mlflow_tracking_uri = "http://localhost:5001"
+            self.data_path = Path("/local/data/kepler_exoplanet_data.csv")
+
 
 # Singleton instance to import across the app
 settings = Settings()

@@ -3,7 +3,8 @@ from fastapi import FastAPI, HTTPException, Depends
 
 from src.predict.predictor import ModelPredictor
 from src.serve.input_schema import InputData
-from config.settings import settings
+from src.config.settings import settings
+from pathlib import Path
 
 
 # Configure logging
@@ -24,7 +25,7 @@ def get_model_uri(env: str) -> str:
         str: Path or URI to the trained model artifact.
     """
     if env == "local":
-        return settings.model_path
+        return str(settings.model_path)
     elif env == "prod":
         return "models:/RandomForestExoplanet@production"
     elif env == "staging":
@@ -35,13 +36,15 @@ def get_model_uri(env: str) -> str:
 
 # Initialize paths to model and expected columns
 model_uri = get_model_uri(settings.env)
-columns_path = settings.model_path.replace(
-    "random_forest.joblib", "expected_columns.json"
+
+columns_path = Path(
+    str(settings.model_path).replace("random_forest.joblib", "expected_columns.json")
 )
+
 
 # Load model and expected input schema
 try:
-    predictor = ModelPredictor(model_uri=model_uri, columns_path=columns_path)
+    predictor = ModelPredictor(model_uri=model_uri, columns_path=str(columns_path))
     logging.info(f"ModelPredictor initialized with model_uri='{model_uri}'")
 except Exception as e:
     logging.error(f"Failed to initialize ModelPredictor: {e}")

@@ -8,16 +8,19 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install MLflow, FastAPI, Uvicorn, and Airflow
+# Install additional dependencies
 RUN pip install mlflow uvicorn apache-airflow
 
-# Copy the rest of your application files
-COPY . .
+# Copy the entire src folder into the Docker image
+COPY ./src /app/src
 
-# Expose ports for FastAPI (8000), MLflow (5001), and Airflow (8080)
-EXPOSE 8000
-EXPOSE 5001
-EXPOSE 8080
+# Copy sample_input.json and expected_columns.json into the Docker image
+COPY ./models/sample_input.json /app/sample_input.json
+COPY ./models/expected_columns.json /app/models/expected_columns.json
+COPY ./models/random_forest.joblib /app/models/random_forest.joblib
 
-# Start FastAPI, MLflow, and Airflow webserver in the same container
-CMD ["sh", "-c", "mlflow server --host 0.0.0.0 --port 5001 & airflow webserver --port 8080 & uvicorn serve.main:app --host 0.0.0.0 --port 8000"]
+# Expose necessary ports
+EXPOSE 8000 5000 8080
+
+# Start the FastAPI app and Airflow web server
+CMD ["uvicorn", "src.serve.main:app", "--host", "0.0.0.0", "--port", "8000"]

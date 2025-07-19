@@ -1,12 +1,36 @@
 services:
-  # Single service running FastAPI, MLflow, and Airflow
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile  # Use the Dockerfile you created
+  fastapi:
+    build: .
     ports:
       - "8000:8000"  # Exposing FastAPI on port 8000
+    volumes:
+      - ./models/sample_input.json:/app/sample_input.json
+      - ./models/expected_columns.json:/app/models/expected_columns.json
+      - ./models/random_forest.joblib:/app/models/random_forest.joblib
+    networks:
+      - app_network
+
+  mlflow:
+    image: bitnami/mlflow
+    ports:
       - "5001:5001"  # Exposing MLflow UI on port 5001
+    environment:
+      - MLFLOW_TRACKING_URI=http://localhost:5001
+    volumes:
+      - ./mlruns:/mlflow/mlruns  # Persist MLflow experiment data
+      - ./mlartifacts:/mlflow/artifacts  # Persist artifact data
+    networks:
+      - app_network
+
+  airflow:
+    image: apache/airflow:2.9.1
+    environment:
+      - AIRFLOW__WEBSERVER__RBAC=True
+      - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+      - AIRFLOW__WEBSERVER__WEB_SERVER_USERNAME=${AIRFLOW_USERNAME}
+      - AIRFLOW__WEBSERVER__WEB_SERVER_PASSWORD=${AIRFLOW_PASSWORD}
+    ports:
       - "8080:8080"  # Exposing Airflow Web UI on port 8080
     volumes:
       - ./dags:/opt/airflow/dags  # Mount Airflow DAGs
