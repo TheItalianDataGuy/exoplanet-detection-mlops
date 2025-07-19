@@ -1,5 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()  # Ensure environment variables are loaded from .env file.
 
 
 class Settings(BaseSettings):
@@ -30,7 +33,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
     # Data paths
-    data_path: Path = Path("/data/kepler_exoplanet_data.csv")
+    data_path: Path = Path("data/kepler_exoplanet_data.csv")
 
     # Metrics paths
     metrics_path: Path = Path("models/metrics.json")
@@ -53,14 +56,18 @@ class Settings(BaseSettings):
 
         # Set environment-specific paths and MLflow URIs
         if self.env == "prod":
-            self.mlflow_tracking_uri = "https://prod.mlflow.server"
+            self.mlflow_tracking_uri = (
+                "https://prod.mlflow.server"  # For production environment
+            )
             self.data_path = Path("/prod/data/kepler_exoplanet_data.csv")
         elif self.env == "staging":
-            self.mlflow_tracking_uri = "https://staging.mlflow.server"
+            self.mlflow_tracking_uri = (
+                "https://staging.mlflow.server"  # For staging environment
+            )
             self.data_path = Path("/staging/data/kepler_exoplanet_data.csv")
         else:
-            self.mlflow_tracking_uri = "http://localhost:5001"
-            self.data_path = Path("/local/data/kepler_exoplanet_data.csv")
+            self.mlflow_tracking_uri = "http://localhost:5001"  # For local development
+            self.data_path = Path("data/kepler_exoplanet_data.csv")
 
 
 # Singleton instance to import across the app

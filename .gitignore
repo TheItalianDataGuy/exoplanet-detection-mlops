@@ -211,3 +211,5 @@ data/
 mlflow/
 mlruns/
 mlartifacts/
+airflow/airflow.cfg
+setup_airflow.sh
