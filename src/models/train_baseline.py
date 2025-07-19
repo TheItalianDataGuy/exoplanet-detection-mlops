@@ -13,6 +13,7 @@ from mlflow.models import infer_signature
 from mlflow.tracking.client import MlflowClient
 from config.settings import settings
 
+# Load environment variables
 load_dotenv()
 
 # Configure logging
@@ -25,8 +26,7 @@ logger = logging.getLogger(__name__)
 def configure_logging() -> None:
     """Configure global logging settings."""
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
 
@@ -84,7 +84,15 @@ def train_model(
     try:
         clf = RandomForestClassifier(**params)
         clf.fit(X_train, y_train)
-        return clf
+
+        # Save the trained model
+        model_save_dir = Path(settings.model_save_dir)
+        model_save_dir.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
+        model_save_path = model_save_dir / "random_forest.joblib"
+        joblib.dump(clf, model_save_path)
+        logger.info(f"Model saved to: {model_save_path}")
+
+        return clf, model_save_path  # type: ignore
     except Exception as e:
         logger.error(f"Error during model training: {e}", exc_info=True)
         raise
@@ -109,9 +117,34 @@ def evaluate_model(
         accuracy = accuracy_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred, average="weighted")
         logger.info(f"Accuracy: {accuracy}, F1 Score: {f1}")
-        return {"accuracy": accuracy, "f1_score": f1}
+
+        # Save metrics to a JSON file
+        metrics = {"accuracy": accuracy, "f1_score": f1}
+        metrics_path = settings.metrics_path
+        save_metrics(metrics, metrics_path)
+
+        return metrics
     except Exception as e:
         logger.error(f"Error during model evaluation: {e}", exc_info=True)
+        raise
+
+
+def save_metrics(metrics: dict, metrics_path: str):
+    """
+    Save the model evaluation metrics to a file.
+
+    Args:
+        metrics: A dictionary containing the evaluation metrics.
+        metrics_path: The path to save the metrics file.
+    """
+    try:
+        # Ensure the directory exists
+        Path(metrics_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f)
+        logger.info(f"Metrics saved to: {metrics_path}")
+    except Exception as e:
+        logger.error(f"Error saving metrics: {e}", exc_info=True)
         raise
 
 
@@ -119,7 +152,7 @@ def save_artifacts(
     X_train: pd.DataFrame,
     model_path: Path,
     expected_cols_path: Path,
-    artifact_dir: Path = "models/",
+    artifact_dir: Path = Path("models"),
 ) -> None:
     """
     Save expected columns and sample input for downstream validation and FastAPI documentation.
@@ -186,7 +219,7 @@ def main():
         logger.info(f"MLflow Experiment set to: {settings.mlflow_experiment_name}")
 
         # Load and preprocess data
-        data_path = "data/kepler_exoplanet_data.csv"
+        data_path = settings.data_path  # Path from settings
         df = load_data(data_path)
         logger.info(f"Data loaded and preprocessed with shape: {df.shape}")
 
@@ -204,14 +237,13 @@ def main():
 
         # Train model
         rf_params = {"n_estimators": 150, "max_depth": 15, "random_state": 42}
-        clf = train_model(X_train, y_train, rf_params)
+        clf, model_save_path = train_model(X_train, y_train, rf_params)
 
         # Evaluate model
         metrics = evaluate_model(clf, X_test, y_test)
         logger.info(f"Model evaluation metrics: {metrics}")
 
         # Save model locally
-        model_save_path = Path("models/random_forest.joblib")
         joblib.dump(clf, model_save_path)
         logger.info(f"Trained model saved to: {model_save_path}")
 
