@@ -5,7 +5,8 @@ from src.predict.predictor import ModelPredictor
 from src.serve.input_schema import InputData
 from config.settings import settings
 
-# Configure logging: uniform format for all log messages
+
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -106,4 +107,4 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("src.serve.main:app", host="127.0.0.1", port=8000, reload=False)

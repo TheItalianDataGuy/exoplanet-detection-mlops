@@ -17,11 +17,14 @@ class Settings(BaseSettings):
     sample_path: str = "sample_input.json"
 
     # MLflow tracking configuration
-    tracking_uri: str = "http://localhost:5001"
-    experiment_name: str = "exoplanet-detection"
+    mlflow_tracking_uri: str = "http://localhost:5001"
+    mlflow_experiment_name: str = "exoplanet-detection"
 
     # Load from .env automatically
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env", extra="allow")
+
+    # Python path for module imports
+    pythonpath: str = "src"
 
 
 # Singleton instance to import across the app
