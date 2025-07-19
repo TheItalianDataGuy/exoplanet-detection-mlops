@@ -1,48 +1,66 @@
-from fastapi import FastAPI, HTTPException
+import os
+import logging
+from fastapi import FastAPI, HTTPException, Depends
 from src.predict.predictor import ModelPredictor
 from src.serve.input_schema import InputData
-import logging
-import os
 
-# Read environment setting (local or prod)
-ENV = os.getenv("ENV", "local")
-
-# Set model path depending on environment
-MODEL_URI = (
-    "models/random_forest.joblib"
-    if ENV == "local"
-    else "models:/RandomForestExoplanet@production"
-)
-COLUMNS_PATH = "models/expected_columns.json"
-
-# Set up logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# Load model
+# Determine environment from ENV variable, default 'local'
+ENV = os.getenv("ENV", "local")
+
+
+def get_model_uri(env: str) -> str:
+    """
+    Determine model URI based on environment.
+    """
+    if env == "local":
+        return "models/random_forest.joblib"
+    else:
+        return "models:/RandomForestExoplanet@production"
+
+
+# Load model once at module load time
+MODEL_URI = get_model_uri(ENV)
+COLUMNS_PATH = "models/expected_columns.json"
+
 try:
     predictor = ModelPredictor(model_uri=MODEL_URI, columns_path=COLUMNS_PATH)
-    logging.info(f"ModelPredictor initialized in '{ENV}' mode.")
+    logging.info(f"ModelPredictor initialized with model_uri='{MODEL_URI}'")
 except Exception as e:
     logging.error(f"Failed to initialize ModelPredictor: {e}")
     raise RuntimeError("Failed to load model or expected columns.")
 
+
+def get_predictor() -> ModelPredictor:
+    """
+    Dependency that returns the already loaded ModelPredictor instance.
+    """
+    return predictor
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Exoplanet Detection API",
-    description="A simple API that uses a RandomForest model to predict exoplanets",
+    description="API to predict exoplanets using a RandomForest model",
     version="1.0.0",
 )
 
 
-# Root endpoint
 @app.get("/")
 def read_root():
+    """
+    Root endpoint returning a welcome message.
+    """
     return {"message": "Welcome to the Exoplanet Detection API"}
 
 
-# Prediction endpoint
 @app.post("/predict", response_model=dict)
-def predict(data: InputData):
+def predict(data: InputData, predictor: ModelPredictor = Depends(get_predictor)):
+    """
+    Prediction endpoint using the shared ModelPredictor instance.
+    """
     try:
         result = predictor.predict(data.input)
         return result
@@ -51,7 +69,15 @@ def predict(data: InputData):
         raise HTTPException(status_code=400, detail=f"Prediction failed: {str(e)}")
 
 
-# Health check endpoint
 @app.get("/health")
 def health_check():
+    """
+    Health check endpoint.
+    """
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=9696)

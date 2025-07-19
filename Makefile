@@ -12,7 +12,7 @@ lint:
 
 # Run tests
 test:
-	PYTHONPATH=. pytest tests/
+	PYTHONPATH=$(pwd)/src python -m pytest tests/
 
 # Start FastAPI app
 run:
@@ -29,3 +29,12 @@ register-best:
 # Run FastAPI app in production mode
 run-prod:
 	ENV=prod uvicorn src.serve.main:app --host 0.0.0.0 --port 8000
+
+# Start MLflow UI
+mlflow-ui:
+	@mkdir -p mlflow/mlruns
+	mlflow server \
+		--backend-store-uri sqlite:///mlflow/mlruns.db \
+		--default-artifact-root ./mlflow/mlruns \
+		--host 0.0.0.0 \
+		--port 5001

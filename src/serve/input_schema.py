@@ -1,5 +1,5 @@
 from typing import List, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
 from pathlib import Path
 import json
 import logging
@@ -24,15 +24,13 @@ def _load_sample_input() -> List[Dict[str, float]]:
         with open(sample_path, "r") as f:
             data = json.load(f)
             if isinstance(data, list) and data:
-                return data[
-                    :1
-                ]  # Use only the first record to avoid clutter in Swagger docs
+                return data[:1]
             else:
                 logger.warning("sample_input.json exists but is not a non-empty list.")
     except Exception as e:
         logger.warning(f"Failed to load sample_input.json: {e}")
 
-    # Fallback example structure (minimal valid input)
+    # Fallback example structure
     return [{"koi_period": 1.0}]
 
 
@@ -44,4 +42,8 @@ class InputData(BaseModel):
         input (List[Dict[str, float]]): A list of dictionaries, each representing a single feature vector.
     """
 
-    input: List[Dict[str, float]] = Field(..., example=_load_sample_input())
+    input: List[Dict[str, float]]
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"input": _load_sample_input()}}  # type: ignore
+    )

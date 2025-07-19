@@ -209,5 +209,6 @@ __marimo__/
 __pycache__/
 .venv/
 data/
-models/
+mlflow/
 mlruns/
+mlartifacts/

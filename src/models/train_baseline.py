@@ -1,112 +1,194 @@
 import os
 import json
+import logging
+from pathlib import Path
+
 import pandas as pd
 import joblib
-import logging
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score
+
 import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
 
-# Set MLflow tracking URI from environment or default fallback
-mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
-# Set experiment name in MLflow
-EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "exoplanet-detection")
-mlflow.set_experiment(EXPERIMENT_NAME)
-
-# Ensure local directory exists for model artifacts
-os.makedirs("models", exist_ok=True)
-
-# Load and clean dataset
-df = pd.read_csv("data/kepler_exoplanet_data.csv")
-
-# Drop irrelevant or redundant columns
-df = df.drop(
-    columns=["rowid", "kepid", "kepoi_name", "kepler_name", "koi_pdisposition"],
-    errors="ignore",
-)
-
-# Drop error columns (e.g., *_err1, *_err2)
-error_cols = [col for col in df.columns if "_err1" in col or "_err2" in col]
-df = df.drop(columns=error_cols)
-
-# Encode target variable numerically
-df["koi_disposition"] = df["koi_disposition"].map(
-    {"FALSE POSITIVE": 0, "CANDIDATE": 1, "CONFIRMED": 2}
-)
-
-# Keep only numeric features, cast to float64
-df = df.select_dtypes(include="number").astype("float64")
-
-# Drop target leakage column if present
-df = df.drop(columns=["koi_score"], errors="ignore")
-
-# Split features and target
-X = df.drop(columns=["koi_disposition"])
-y = df["koi_disposition"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
-
-# Define model hyperparameters
-params = {"n_estimators": 150, "max_depth": 15, "random_state": 42}
-
-# Train the Random Forest classifier
-clf = RandomForestClassifier(**params)
-clf.fit(X_train, y_train)
-
-# Evaluate model performance
-y_pred = clf.predict(X_test)
-acc = accuracy_score(y_test, y_pred)
-f1 = f1_score(y_test, y_pred, average="weighted")
-
-# Start MLflow tracking
-with mlflow.start_run(run_name="baseline_rf_150trees") as run:
-    # Log parameters and metrics
-    mlflow.log_params(params)
-    mlflow.log_metrics({"accuracy": acc, "f1_score": f1})
-
-    # Save model locally
-    joblib.dump(clf, "models/random_forest.joblib")
-
-    # Log model with input example and signature
-    mlflow.sklearn.log_model(
-        sk_model=clf,
-        artifact_path="model",
-        input_example=X_train.sample(1, random_state=42),
-        signature=infer_signature(X_train, clf.predict(X_train)),
+def configure_logging() -> None:
+    """Configure global logging settings."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
     )
 
-    # Save sample input for FastAPI documentation
-    sample_input_path = "sample_input.json"
-    X_train.sample(1, random_state=42).to_json(
-        sample_input_path, orient="records", lines=False
-    )
-    mlflow.log_artifact(sample_input_path)
 
-    # Save expected columns for input validation in FastAPI
-    expected_cols_path = "models/expected_columns.json"
-    with open(expected_cols_path, "w") as f:
+def load_data(data_path: str) -> pd.DataFrame:
+    """
+    Load and preprocess the Kepler exoplanet dataset.
+
+    Args:
+        data_path: Path to the CSV dataset.
+
+    Returns:
+        Preprocessed pandas DataFrame.
+    """
+    df = pd.read_csv(data_path)
+
+    # Drop irrelevant columns that do not contribute to the model
+    drop_cols = [
+        "rowid",
+        "kepid",
+        "kepoi_name",
+        "kepler_name",
+        "koi_pdisposition",
+    ]
+    df.drop(columns=drop_cols, errors="ignore", inplace=True)
+
+    # Remove error-related columns
+    error_cols = [col for col in df.columns if "_err1" in col or "_err2" in col]
+    df.drop(columns=error_cols, inplace=True)
+
+    # Encode target labels numerically
+    disposition_map = {"FALSE POSITIVE": 0, "CANDIDATE": 1, "CONFIRMED": 2}
+    df["koi_disposition"] = df["koi_disposition"].map(disposition_map)
+
+    # Retain only numeric columns for model input
+    df = df.select_dtypes(include="number").astype("float64")
+
+    # Remove potential data leakage columns
+    df.drop(columns=["koi_score"], errors="ignore", inplace=True)
+
+    return df
+
+
+def train_model(
+    X_train: pd.DataFrame, y_train: pd.Series, params: dict
+) -> RandomForestClassifier:
+    """
+    Train a RandomForestClassifier with given parameters.
+
+    Args:
+        X_train: Training features.
+        y_train: Training labels.
+        params: Hyperparameters for RandomForestClassifier.
+
+    Returns:
+        Trained RandomForestClassifier instance.
+    """
+    clf = RandomForestClassifier(**params)
+    clf.fit(X_train, y_train)
+    return clf
+
+
+def evaluate_model(
+    clf: RandomForestClassifier, X_test: pd.DataFrame, y_test: pd.Series
+) -> dict:
+    """
+    Evaluate the model on test data and return relevant metrics.
+
+    Args:
+        clf: Trained classifier.
+        X_test: Test features.
+        y_test: Test labels.
+
+    Returns:
+        Dictionary with accuracy and weighted F1-score.
+    """
+    y_pred = clf.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred, average="weighted")
+    return {"accuracy": accuracy, "f1_score": f1}
+
+
+def save_artifacts(
+    X_train: pd.DataFrame, model_path: Path, expected_cols_path: Path
+) -> None:
+    """
+    Save expected columns and sample input for downstream validation and FastAPI documentation.
+
+    Args:
+        X_train: Training features DataFrame.
+        model_path: Path where the trained model will be saved.
+        expected_cols_path: Path to save the expected input columns JSON (e.g. models/expected_columns.json).
+    """
+    # Save expected input columns to the models/ directory (not inside src/)
+    expected_cols_path = Path("models/expected_columns.json")
+    expected_cols_path.parent.mkdir(parents=True, exist_ok=True)
+    with expected_cols_path.open("w") as f:
         json.dump(X_train.columns.tolist(), f)
-    mlflow.log_artifact(expected_cols_path)
+    logging.info(f"Expected columns saved to: {expected_cols_path}")
 
-    # Add tags and register model
-    mlflow.set_tags({"stage": "baseline", "type": "RandomForest"})
-    model_uri = f"runs:/{run.info.run_id}/model"
-    mlflow.register_model(model_uri=model_uri, name="RandomForestExoplanet")
+    # Save sample input to the root directory for FastAPI documentation (/sample_input.json)
+    project_root = Path(__file__).resolve().parents[2]
+    sample_input_path = project_root / "sample_input.json"
+    X_train.sample(1, random_state=42).to_json(sample_input_path, orient="records")
+    logging.info(f"Sample input saved to: {sample_input_path}")
 
-# Log completion
-logging.info("Model trained, evaluated, logged, and registered.")
+    # Log both artifacts to MLflow
+    mlflow.log_artifact(str(expected_cols_path))
+    mlflow.log_artifact(str(sample_input_path))
 
-# Trigger model selection pipeline (optional automation)
-os.system("python src/models/register_best_model.py")
+
+def main():
+    configure_logging()
+    load_dotenv()
+
+    mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    mlflow.set_tracking_uri(mlflow_tracking_uri)
+    logging.info(f"MLflow tracking URI set to: {mlflow_tracking_uri}")
+
+    experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "exoplanet-detection")
+    mlflow.set_experiment(experiment_name)
+    logging.info(f"MLflow experiment set to: {experiment_name}")
+
+    data_path = "data/kepler_exoplanet_data.csv"
+    df = load_data(data_path)
+    logging.info(f"Data loaded and preprocessed with shape: {df.shape}")
+
+    X = df.drop(columns=["koi_disposition"])
+    y = df["koi_disposition"]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, stratify=y, random_state=42
+    )
+    logging.info(
+        f"Train/test split completed: {X_train.shape[0]} train, {X_test.shape[0]} test"
+    )
+
+    rf_params = {"n_estimators": 150, "max_depth": 15, "random_state": 42}
+    clf = train_model(X_train, y_train, rf_params)
+    metrics = evaluate_model(clf, X_test, y_test)
+    logging.info(f"Model evaluation metrics: {metrics}")
+
+    model_save_path = Path(os.getenv("MODEL_PATH", "models/random_forest.joblib"))
+    joblib.dump(clf, model_save_path)
+    logging.info(f"Trained model saved to: {model_save_path}")
+
+    # Start MLflow run for logging parameters, metrics, and model
+    with mlflow.start_run(run_name="baseline_rf_150trees") as run:
+        mlflow.log_params(rf_params)
+        mlflow.log_metrics({k: float(v) for k, v in metrics.items()})
+
+        mlflow.sklearn.log_model(
+            sk_model=clf,
+            artifact_path="model",
+            input_example=X_train.sample(1, random_state=42),
+            signature=infer_signature(X_train, clf.predict(X_train)),
+        )
+
+        save_artifacts(X_train, model_save_path, Path("models/expected_columns.json"))
+
+        mlflow.set_tags({"stage": "baseline", "model_type": "RandomForest"})
+
+        model_uri = f"runs:/{run.info.run_id}/model"
+        mlflow.register_model(model_uri=model_uri, name="RandomForestExoplanet")
+
+    logging.info("Training, logging, and registration complete.")
+
+    # Optional: trigger downstream scripts or pipelines
+    os.system("python src/models/register_best_model.py")
+
+
+if __name__ == "__main__":
+    main()
