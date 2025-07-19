@@ -29,7 +29,7 @@ Classify whether a signal observed by the Kepler telescope corresponds to an **e
 - 🧹 Code quality with **black**, **ruff**, and **flake8**
 - ✅ Pre-commit hooks for consistency
 - 🧪 Monitoring with **Evidently**
-- 🧱 Workflow orchestration with **Airflow** or **Prefect**
+- 🧱 Workflow orchestration with **Airflow**
 - ⚙️ Reproducibility via `Makefile`, `requirements.txt`, `.env.example`
 
 ---
@@ -97,6 +97,8 @@ You can use the `Makefile` to simplify common tasks:
 | `make run`           | Launch the FastAPI server locally      |
 | `make train`         | Train the baseline RandomForest model  |
 | `make register-best` | Register the best model to MLflow      |
+| `make run-prod`      | Run FastAPI app in production mode     |
+| `make mlflow-ui`     | Start MLflow UI                        |
 
 ## 🌐 API Usage
 
