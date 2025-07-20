@@ -133,7 +133,8 @@ set-env-local:
 	@echo "env=local" > .env && echo "Set environment to LOCAL"
 
 set-env-docker:
-	@echo "env=docker" > .env && echo "Set environment to DOCKER"
+	@echo "Setting environment to 'docker'"
+	@sed -i '' 's/^env=.*/env=docker/' .env || echo "env=docker" >> .env
 
 set-env-staging:
 	@echo "env=staging" > .env && echo "Set environment to STAGING"

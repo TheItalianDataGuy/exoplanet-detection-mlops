@@ -13,8 +13,11 @@ services:
       - ./sample_input.json:/app/sample_input.json
     env_file:
       - .env
+    working_dir: /app
+    command: uvicorn serve.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app/src
     depends_on:
       - mlflow
     healthcheck:
@@ -33,13 +36,12 @@ services:
       - ./mlflow:/mlflow
       - ./mlflow/mlflow.db:/mlflow/mlflow.db 
       - ./mlartifacts:/mlartifacts
-    command: [
-      "mlflow", "server",
-      "--backend-store-uri", "sqlite:///mlflow/mlflow.db",
-      "--default-artifact-root", "/mlartifacts",
-      "--host", "0.0.0.0",
-      "--port", "5000"
-    ]
+    command: >
+      mlflow server 
+      --backend-store-uri sqlite:///mlflow/mlflow.db 
+      --default-artifact-root /mlartifacts 
+      --host 0.0.0.0 
+      --port 5000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000"]
       interval: 15s
@@ -48,30 +50,46 @@ services:
     restart: unless-stopped
 
   airflow:
-    image: apache/airflow:slim-latest-python3.11
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile.airflow
+    image: airflow-custom
     container_name: mlops-airflow
+    depends_on:
+      - postgres
     ports:
       - "8080:8080"
     volumes:
-      - ./airflow:/opt/airflow
-      - airflow_logs:/opt/airflow/logs
-      - airflow_plugins:/opt/airflow/plugins
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./:/opt/project
     env_file:
       - .env
     environment:
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__WEBSERVER__WORKERS: 2
+      PYTHONPATH: /opt/project
     command: >
       bash -c "
-        airflow db migrate &&
+        export AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_WWW_USER_USERNAME} &&
+        export AIRFLOW_WWW_USER_FIRSTNAME=${AIRFLOW_WWW_USER_FIRSTNAME} &&
+        export AIRFLOW_WWW_USER_LASTNAME=${AIRFLOW_WWW_USER_LASTNAME} &&
+        export AIRFLOW_WWW_USER_ROLE=${AIRFLOW_WWW_USER_ROLE} &&
+        export AIRFLOW_WWW_USER_EMAIL=${AIRFLOW_WWW_USER_EMAIL} &&
+        export AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_WWW_USER_PASSWORD} &&
+        airflow db upgrade &&
         airflow users create \
-          --username $$AIRFLOW_WWW_USER_USERNAME \
-          --firstname $$AIRFLOW_WWW_USER_FIRSTNAME \
-          --lastname $$AIRFLOW_WWW_USER_LASTNAME \
-          --role $$AIRFLOW_WWW_USER_ROLE \
-          --email $$AIRFLOW_WWW_USER_EMAIL \
-          --password $$AIRFLOW_WWW_USER_PASSWORD &&
-        airflow webserver --port 8080 & 
-        airflow scheduler"
+          --username $AIRFLOW_WWW_USER_USERNAME \
+          --firstname $AIRFLOW_WWW_USER_FIRSTNAME \
+          --lastname $AIRFLOW_WWW_USER_LASTNAME \
+          --role $AIRFLOW_WWW_USER_ROLE \
+          --email $AIRFLOW_WWW_USER_EMAIL \
+          --password $AIRFLOW_WWW_USER_PASSWORD &&
+        airflow scheduler &
+        airflow webserver
+      "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 20s
@@ -79,6 +97,18 @@ services:
       retries: 3
     restart: unless-stopped
 
+  postgres:
+    image: postgres:13
+    container_name: mlops-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    restart: always
+
 volumes:
   airflow_logs:
   airflow_plugins:
+  postgres-db-volume:

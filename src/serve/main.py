@@ -24,7 +24,7 @@ def get_model_uri(env: str) -> str:
     Returns:
         str: Path or URI to the trained model artifact.
     """
-    if env == "local":
+    if env in {"local", "docker"}:
         return str(settings.model_path)
     elif env == "prod":
         return "models:/RandomForestExoplanet@production"
