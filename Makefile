@@ -76,6 +76,11 @@ stop-airflow:
 	@kill $$(lsof -t -i:8080) || true
 	@kill $$(lsof -t -i:8793) || true
 
+import-airflow-vars:
+	@echo "Importing Airflow variables from JSON"
+	docker cp airflow/airflow_variables.json mlops-airflow:/opt/airflow/airflow_variables.json
+	docker exec -it mlops-airflow airflow variables import /opt/airflow/airflow_variables.json
+
 # -------------------
 # Docker Commands
 # -------------------
@@ -99,6 +104,7 @@ build:
 
 start: check-ports
 	docker compose up -d
+	$(MAKE) import-airflow-vars
 
 stop:
 	docker compose down
@@ -124,6 +130,9 @@ clean:
 train-docker:
 	@echo "Training model inside Docker container"
 	docker compose exec fastapi python src/models/train_baseline.py
+
+check-docker:
+	@docker info > /dev/null 2>&1 || (echo "Docker daemon is not running!" && exit 1)
 
 # -------------------
 # Environment Helpers

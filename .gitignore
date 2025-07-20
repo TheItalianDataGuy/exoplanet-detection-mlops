@@ -214,3 +214,4 @@ mlartifacts/
 airflow/airflow.cfg
 setup_airflow.sh
 airflow/airflow.db
+airflow/airflow_variables.json

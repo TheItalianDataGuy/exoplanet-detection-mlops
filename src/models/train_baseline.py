@@ -11,7 +11,7 @@ import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature
 from mlflow.tracking.client import MlflowClient
-from config.settings import settings
+from src.config.settings import settings
 
 # Load environment variables
 load_dotenv()

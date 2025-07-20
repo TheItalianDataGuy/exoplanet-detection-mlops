@@ -17,7 +17,7 @@ services:
     command: uvicorn serve.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
-      - PYTHONPATH=/app/src
+      - PYTHONPATH=/app
     depends_on:
       - mlflow
     healthcheck:
@@ -36,6 +36,9 @@ services:
       - ./mlflow:/mlflow
       - ./mlflow/mlflow.db:/mlflow/mlflow.db 
       - ./mlartifacts:/mlartifacts
+      - .:/opt/project
+    environment:
+      - PYTHONPATH=/opt/project/src
     command: >
       mlflow server 
       --backend-store-uri sqlite:///mlflow/mlflow.db 
@@ -63,7 +66,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
-      - ./:/opt/project
+      - .:/opt/project
     env_file:
       - .env
     environment:

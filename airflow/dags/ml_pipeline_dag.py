@@ -3,7 +3,7 @@ from airflow.decorators import task, dag
 from datetime import timedelta, datetime
 import logging
 from sklearn.model_selection import train_test_split
-from config.settings import settings
+from src.config.settings import settings
 import joblib
 import pandas as pd
 from src.models.train_baseline import (
@@ -34,7 +34,7 @@ def fetch_xcom_value(task_instance, key: str):
 
 
 # Notify in case of failure (Using email)
-email_address = Variable.get("email_address")
+email_address = Variable.get("email_address", default_var="default@example.com")
 
 
 def notify_failure(task_id: str):
