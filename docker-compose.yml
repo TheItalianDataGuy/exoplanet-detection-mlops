@@ -1,47 +1,88 @@
 services:
-  airflow:
-    build: .
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mlops-fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./models:/app/models
+      - ./mlartifacts:/app/mlartifacts
+      - ./sample_input.json:/app/sample_input.json
+    env_file:
+      - .env
     environment:
-      - AIRFLOW_HOME=/opt/airflow
-      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session  
-      - AIRFLOW__WEBSERVER__RBAC=True  
-      - AIRFLOW__WEBSERVER__WEB_SERVER_USERNAME=${AIRFLOW_USERNAME} 
-      - AIRFLOW__WEBSERVER__WEB_SERVER_PASSWORD=${AIRFLOW_PASSWORD} 
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    depends_on:
+      - mlflow
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  mlflow:
+    image: bitnami/mlflow:latest
+    container_name: mlops-mlflow
+    working_dir: /mlflow
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+      - ./mlartifacts:/mlflow/mlartifacts
+      - ./mlruns.db:/mlflow/mlruns.db
+    env_file:
+      - .env
+    command: >
+      bash -c "
+        mlflow server 
+        --backend-store-uri sqlite:///mlruns.db 
+        --default-artifact-root /mlflow/mlartifacts 
+        --host 0.0.0.0 
+        --port 5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  airflow:
+    image: apache/airflow:slim-latest-python3.11
+    container_name: mlops-airflow
     ports:
       - "8080:8080"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/airflow.cfg:/opt/airflow/airflow.cfg
-      - ./mlruns:/opt/airflow/mlruns
-      - ./src/config:/opt/airflow/config
-      - ./docker/setup_airflow.sh:/opt/airflow/setup_airflow.sh
-      - ./airflow/logs:/var/log/airflow
-    networks:
-      - app_network
-    command: ["bash", "-c", "bash /opt/airflow/setup_airflow.sh"]
+      - airflow_logs:/opt/airflow/logs
+      - airflow_plugins:/opt/airflow/plugins
+    env_file:
+      - .env
+    command: >
+      bash -c "
+        airflow db migrate &&
+        if [ ! -f /opt/airflow/airflow_created ]; then
+          airflow users create \
+            --username $$AIRFLOW_WWW_USER_USERNAME \
+            --firstname $$AIRFLOW_WWW_USER_FIRSTNAME \
+            --lastname $$AIRFLOW_WWW_USER_LASTNAME \
+            --role $$AIRFLOW_WWW_USER_ROLE \
+            --email $$AIRFLOW_WWW_USER_EMAIL \
+            --password $$AIRFLOW_WWW_USER_PASSWORD &&
+          touch /opt/airflow/airflow_created;
+        fi &&
+        airflow webserver --port 8080 & 
+        airflow scheduler"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
-  fastapi:
-    build: .
-    ports:
-      - "8000:8000"
-    depends_on:
-      - airflow
-    networks:
-      - app_network
-    command: ["uvicorn", "src.serve.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-  mlflow:
-    image: bitnamicharts/mlflow
-    ports:
-      - "5001:5001"
-    networks:
-      - app_network
-    environment:
-      - MLFLOW_SERVER_FILE_STORE=/app/mlruns
-      - MLFLOW_SERVER_DEFAULT_ARTIFACT_ROOT=/app/mlruns
-    volumes:
-      - ./mlruns:/app/mlruns
-
-networks:
-  app_network:
-    driver: bridge
+volumes:
+  airflow_logs:
+  airflow_plugins:
