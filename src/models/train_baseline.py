@@ -87,7 +87,7 @@ def train_model(
 
         # Save the trained model
         model_save_dir = Path(settings.model_save_dir)
-        model_save_dir.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
+        model_save_dir.mkdir(parents=True, exist_ok=True)
         model_save_path = model_save_dir / "random_forest.joblib"
         joblib.dump(clf, model_save_path)
         logger.info(f"Model saved to: {model_save_path}")
@@ -258,9 +258,7 @@ def main():
                 signature=infer_signature(X_train, clf.predict(X_train)),
             )
 
-            save_artifacts(
-                X_train, model_save_path, Path("models/expected_columns.json")
-            )
+            save_artifacts(X_train, model_save_path, Path("expected_columns.json"))
 
             mlflow.set_tags({"stage": "baseline", "model_type": "RandomForest"})
             model_uri = f"runs:/{run.info.run_id}/model"

@@ -56,17 +56,21 @@ class Settings(BaseSettings):
 
         # Set environment-specific paths and MLflow URIs
         if self.env == "prod":
-            self.mlflow_tracking_uri = (
-                "https://prod.mlflow.server"  # For production environment
-            )
-            self.data_path = Path("/prod/data/kepler_exoplanet_data.csv")
+            self.mlflow_tracking_uri = "https://prod.mlflow.server"
+            self.data_path = Path("data/kepler_exoplanet_data.csv")
+
         elif self.env == "staging":
+            self.mlflow_tracking_uri = "https://staging.mlflow.server"
+            self.data_path = Path("data/kepler_exoplanet_data.csv")
+
+        elif self.env == "docker":
             self.mlflow_tracking_uri = (
-                "https://staging.mlflow.server"  # For staging environment
+                "http://mlflow:5000"  # internal Docker networking
             )
-            self.data_path = Path("/staging/data/kepler_exoplanet_data.csv")
-        else:
-            self.mlflow_tracking_uri = "http://localhost:5001"  # For local development
+            self.data_path = Path("data/kepler_exoplanet_data.csv")
+
+        else:  # local
+            self.mlflow_tracking_uri = "http://localhost:5001"
             self.data_path = Path("data/kepler_exoplanet_data.csv")
 
 

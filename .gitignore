@@ -213,3 +213,4 @@ mlruns/
 mlartifacts/
 airflow/airflow.cfg
 setup_airflow.sh
+airflow/airflow.db

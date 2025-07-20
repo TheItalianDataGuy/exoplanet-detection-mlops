@@ -80,37 +80,63 @@ stop-airflow:
 # Docker Commands
 # -------------------
 
-free-ports:
-	@echo "Checking and freeing ports 5001, 8000, and 8080"
-	@for port in 5001 8000 8080; do \
-		pids=$$(lsof -ti tcp:$$port); \
-		if [ -n "$$pids" ]; then \
-			echo "Port $$port is in use by PID(s): $$pids"; \
-			for pid in $$pids; do \
-				echo "Trying to kill PID $$pid..."; \
-				kill -9 $$pid 2>/dev/null || echo "Could not kill PID $$pid. You may need to close it manually."; \
-			done; \
+PORTS := 5001 8000 8080
+
+check-ports:
+	@echo "Checking for running processes on ports $(PORTS)"
+	@for port in $(PORTS); do \
+		pid=$$(lsof -ti tcp:$$port); \
+		if [ -n "$$pid" ]; then \
+			echo "Port $$port is in use by PID $$pid. Attempting to terminate..."; \
+			kill -9 $$pid || echo "Failed to kill process on port $$port. Please stop it manually."; \
 		else \
 			echo "Port $$port is free."; \
-		fi; \
+		fi \
 	done
 
-start:
-	@echo "Checking for running processes on ports 5001, 8000, and 8080"
-	@bash -c '\
-		for port in 5001 8000 8080; do \
-			if lsof -i :$$port >/dev/null 2>&1; then \
-				echo "Port $$port is already in use. Please free it before continuing."; \
-				exit 1; \
-			fi; \
-		done'
-	@echo "Starting Docker Compose services"
-	docker-compose up --build
+build:
+	docker compose build
 
-docker-down:
-	@echo "Stopping and removing Docker Compose containers"
-	docker-compose down --remove-orphans
+start: check-ports
+	docker compose up -d
+
+stop:
+	docker compose down
+
+logs:
+	docker compose logs -f
+
+fastapi-logs:
+	docker compose logs -f fastapi
+
+mlflow-logs:
+	docker compose logs -f mlflow
+
+airflow-logs:
+	docker compose logs -f airflow
+
+restart: stop start
 
 clean:
-	@echo "Cleaning Docker system (containers, images, volumes, and cache)"
-	docker system prune -af --volumes
+	docker system prune -af
+	docker volume prune -f
+
+train-docker:
+	@echo "Training model inside Docker container"
+	docker compose exec fastapi python src/models/train_baseline.py
+
+# -------------------
+# Environment Helpers
+# -------------------
+
+set-env-local:
+	@echo "env=local" > .env && echo "Set environment to LOCAL"
+
+set-env-docker:
+	@echo "env=docker" > .env && echo "Set environment to DOCKER"
+
+set-env-staging:
+	@echo "env=staging" > .env && echo "Set environment to STAGING"
+
+set-env-prod:
+	@echo "env=prod" > .env && echo "Set environment to PROD"
