@@ -17,26 +17,17 @@ from src.models.train_baseline import (
 from airflow.operators.email import EmailOperator
 from airflow.models import Variable
 
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants from settings (now correctly as Path objects)
+# Constants
 EVALUATION_METRICS_PATH = settings.metrics_path
 SUCCESS_THRESHOLD = settings.success_threshold
-
-
-# Helper function to check if a value exists in XCom
-def fetch_xcom_value(task_instance, key: str):
-    """Fetch XCom value from previous task."""
-    return task_instance.xcom_pull(task_ids=key)
-
-
-# Notify in case of failure (Using email)
 email_address = Variable.get("email_address", default_var="default@example.com")
 
 
+# Notify on failure
 def notify_failure(task_id: str):
     return EmailOperator(
         task_id=f"send_email_on_{task_id}_failure",
@@ -46,7 +37,6 @@ def notify_failure(task_id: str):
     )
 
 
-# Default arguments to be used by each task
 default_args = {
     "retries": 3,
     "retry_delay": timedelta(minutes=5),
@@ -67,79 +57,65 @@ def ml_pipeline():
 
     @task()
     def load_and_preprocess_data() -> pd.DataFrame:
-        """Load and preprocess the data."""
         logger.info("Loading data and preprocessing.")
-        data_path = settings.data_path
-        return load_data(data_path)
+        return load_data(settings.data_path)
 
     @task()
-    def split_data(df: pd.DataFrame) -> tuple:
-        """Split the data into training and test sets."""
+    def split_data(df: pd.DataFrame):
         X = df.drop(columns=["koi_disposition"])
         y = df["koi_disposition"]
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, stratify=y, random_state=42
         )
-        return X_train, X_test, y_train, y_test
+        return {
+            "X_train": X_train,
+            "X_test": X_test,
+            "y_train": y_train,
+            "y_test": y_test,
+        }
 
     @task()
     def train_and_save_model(X_train: pd.DataFrame, y_train: pd.Series) -> Path:
-        """Train the model and save it."""
         logger.info("Training and saving model.")
-        rf_params = {"n_estimators": 150, "max_depth": 15, "random_state": 42}
-        clf, model_save_path = train_model(X_train, y_train, rf_params)
-        return model_save_path  # Now returning Path instead of str
+        clf, model_save_path = train_model(
+            X_train, y_train, {"n_estimators": 150, "max_depth": 15, "random_state": 42}
+        )
+        return model_save_path
 
     @task()
     def evaluate_and_save_metrics(
         model_path: Path, X_test: pd.DataFrame, y_test: pd.Series
     ) -> bool:
-        """Evaluate the model and save metrics."""
         logger.info("Evaluating model.")
-        # Load the model from the saved path
         model = joblib.load(model_path)
-
-        # Call evaluate_model with the model object
         metrics = evaluate_model(model, X_test, y_test)
         save_metrics(metrics, settings.metrics_path)
-
-        if metrics["accuracy"] >= SUCCESS_THRESHOLD:
-            logger.info("Model evaluation passed.")
-            return True
-        else:
-            logger.warning("Model evaluation failed: Accuracy below threshold.")
-            return False
+        return metrics["accuracy"] >= SUCCESS_THRESHOLD
 
     @task()
-    def save_artifacts_to_disk(X_train: pd.DataFrame, model_path: Path) -> None:
-        """Save artifacts like expected columns and sample input."""
-        # Use Path for expected_cols_path from settings.py
-        expected_cols_path = settings.expected_cols_path
-
-        # Call save_artifacts from train_baseline.py with the correct arguments
-        save_artifacts(
-            X_train, model_path, expected_cols_path
-        )  # Now passing Path objects
+    def save_artifacts_to_disk(X_train: pd.DataFrame, model_path: Path):
+        save_artifacts(X_train, model_path, settings.expected_cols_path)
 
     @task()
-    def register_model(evaluation_passed: bool, model_path: Path) -> None:
-        """Register the model if evaluation passes."""
+    def register_model(evaluation_passed: bool, model_path: Path):
         if not evaluation_passed:
-            logger.error("Evaluation failed, not registering model.")
+            logger.warning("Evaluation failed, not registering model.")
             raise ValueError("Model evaluation failed.")
+        register_model_with_alias(f"file://{model_path}", "RandomForestExoplanet")
 
-        logger.info("Registering the model.")
-        model_uri = f"file://{model_path}"  # Change as necessary
-        register_model_with_alias(model_uri, "RandomForestExoplanet")
-
-    # Define task dependencies
+    # DAG structure
     df = load_and_preprocess_data()
-    X_train, X_test, y_train, y_test = split_data(df)  # type: ignore
-    model_path = train_and_save_model(X_train, y_train)  # type: ignore
+    splits = split_data(df)  # type: ignore
+
+    X_train = splits["X_train"]  # type: ignore
+    X_test = splits["X_test"]  # type: ignore
+    y_train = splits["y_train"]  # type: ignore
+    y_test = splits["y_test"]  # type: ignore
+
+    model_path = train_and_save_model(X_train, y_train)
     eval_result = evaluate_and_save_metrics(model_path, X_test, y_test)  # type: ignore
     save_artifacts_to_disk(X_train, model_path)  # type: ignore
     register_model(eval_result, model_path)  # type: ignore
 
 
-# Instantiate the DAG
 ml_pipeline()
