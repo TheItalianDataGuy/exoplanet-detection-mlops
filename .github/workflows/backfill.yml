@@ -1,0 +1,21 @@
+name: Airflow DAG Backfill
+
+on:
+  workflow_dispatch:
+
+jobs:
+  airflow-backfill:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        run: docker compose up -d
+
+      - name: Sleep to allow services to start
+        run: sleep 40
+
+      - name: Run Airflow DAG Backfill
+        run: docker compose exec airflow airflow dags backfill -s 2025-07-21 ml_pipeline_dag

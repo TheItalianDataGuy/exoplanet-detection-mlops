@@ -81,6 +81,11 @@ import-airflow-vars:
 	docker cp airflow/airflow_variables.json mlops-airflow:/opt/airflow/airflow_variables.json
 	docker exec -it mlops-airflow airflow variables import /opt/airflow/airflow_variables.json
 
+backfill-dag:
+	@echo "Running Airflow DAG backfill for ml_pipeline_dag"
+	docker compose exec airflow airflow dags backfill -s $(shell date +%F) ml_pipeline_dag
+
+
 # -------------------
 # Docker Commands
 # -------------------
