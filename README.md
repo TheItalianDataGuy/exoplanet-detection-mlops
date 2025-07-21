@@ -7,7 +7,7 @@
 ![MLflow](https://img.shields.io/badge/MLflow-enabled-blue)
 ![Docker](https://img.shields.io/badge/Docker-ready-blue)
 ![Airflow](https://img.shields.io/badge/Airflow-scheduled-9cf)
-![API Swagger UI Screenshot](images/swagger-ui.png)
+![FastAPI](https://img.shields.io/badge/FastAPI-available-blue)
 ![CI](https://github.com/TheItalianDataGuy/actions/workflows/ci.yml/badge.svg)
 
 ---
