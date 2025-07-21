@@ -1,21 +1,32 @@
-name: Airflow DAG Backfill
+name: Airflow DAG Backfill Test
 
 on:
+  push:
+    paths:
+      - 'airflow/dags/**'
+      - '.github/workflows/backfill.yml'
   workflow_dispatch:
 
 jobs:
-  airflow-backfill:
+  backfill-dag:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Docker
-        run: docker compose up -d
+        uses: docker/setup-buildx-action@v2
 
-      - name: Sleep to allow services to start
-        run: sleep 40
+      - name: Copy CI environment file
+        run: cp .github/workflows/.env.ci .env
 
-      - name: Run Airflow DAG Backfill
-        run: docker compose exec airflow airflow dags backfill -s 2025-07-21 ml_pipeline_dag
+      - name: Build and start containers
+        run: |
+          docker compose build
+          docker compose up -d
+          sleep 30
+
+      - name: Trigger DAG backfill
+        run: |
+          docker compose exec airflow airflow dags backfill -s $(date +%F) ml_pipeline_dag
