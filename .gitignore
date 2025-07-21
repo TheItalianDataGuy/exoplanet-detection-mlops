@@ -208,10 +208,22 @@ __marimo__/
 __pycache__/
 .venv/
 data/
+
+# MLflow artifacts
+
 mlflow/
 mlruns/
 mlartifacts/
-airflow/airflow.cfg
-setup_airflow.sh
+
+# Airflow logs
+airflow/logs/
+
+# Airflow SQLite DB (if used locally)
 airflow/airflow.db
-airflow/airflow_variables.json
+
+# Airflow local configs
+airflow/airflow.cfg
+airflow/unittests.cfg
+
+# __pycache__ folders (Python bytecode)
+**/__pycache__/

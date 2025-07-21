@@ -139,14 +139,15 @@ check-docker:
 # -------------------
 
 set-env-local:
-	@echo "env=local" > .env && echo "Set environment to LOCAL"
+	@echo "ENV=local" > .env && echo "Set environment to LOCAL"
 
 set-env-docker:
 	@echo "Setting environment to 'docker'"
-	@sed -i '' 's/^env=.*/env=docker/' .env || echo "env=docker" >> .env
+	@sed -i '' 's/^ENV=.*/ENV=docker/' .env || echo "ENV=docker" >> .env
 
 set-env-staging:
-	@echo "env=staging" > .env && echo "Set environment to STAGING"
+	@echo "ENV=staging" > .env && echo "Set environment to STAGING"
 
 set-env-prod:
-	@echo "env=prod" > .env && echo "Set environment to PROD"
+	@echo "ENV=prod" > .env && echo "Set environment to PROD"
+
