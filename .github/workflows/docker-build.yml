@@ -23,7 +23,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Copy CI environment file
-        run: cp .env.ci .env
+        run: cp .github/workflows/.env.ci .env
 
       - name: Build all services with Docker Compose
         run: docker compose build
