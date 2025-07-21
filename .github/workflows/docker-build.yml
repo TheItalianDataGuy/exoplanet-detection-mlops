@@ -8,11 +8,6 @@ jobs:
   build-and-validate:
     runs-on: ubuntu-latest
 
-    services:
-      docker:
-        image: docker:24.0.5
-        options: --privileged
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -27,23 +22,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build all services with Docker Compose
-        run: |
-          docker compose build
+      - name: Copy CI environment file
+        run: cp .env.ci .env
 
-      - name: Run containers
-        run: |
-          docker compose up -d
-          sleep 30  # Wait for containers to initialize
+      - name: Build all services with Docker Compose
+        run: docker compose build
+
+      - name: Start containers in detached mode
+        run: docker compose up -d
+
+      - name: Wait for containers to initialize
+        run: sleep 30
 
       - name: Check FastAPI health
-        run: |
-          curl --fail http://localhost:8000/health
+        run: curl --fail http://localhost:8000/health
 
       - name: Check MLflow UI health
-        run: |
-          curl --fail http://localhost:5001
+        run: curl --fail http://localhost:5001
 
-      - name: Check Airflow UI health
-        run: |
-          curl --fail http://localhost:8080/health || echo "Airflow health endpoint may need login"
+      - name: Check Airflow health (optional login required)
+        run: curl --fail http://localhost:8080/health || echo "Airflow health check may require auth"
