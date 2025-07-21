@@ -8,7 +8,7 @@
 ![Docker](https://img.shields.io/badge/Docker-ready-blue)
 ![Airflow](https://img.shields.io/badge/Airflow-scheduled-9cf)
 ![FastAPI](https://img.shields.io/badge/FastAPI-available-blue)
-![CI](https://github.com/TheItalianDataGuy/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/TheItalianDataGuy/exoplanet-detection-mlops/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -282,9 +282,6 @@ This project uses **GitHub Actions** for continuous integration:
 - Execute unit and integration tests
 - Prevent merge on failure
 - Auto-build on push to main/dev branches
-
-Badge:  
-![CI](https://github.com/TheItalianDataGuy/exoplanet-detection-mlops/actions/workflows/ci.yml/badge.svg)
 
 ---
 
