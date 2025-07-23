@@ -85,3 +85,6 @@ jobs:
           echo "Airflow failed to become healthy. Showing logs."
           docker compose logs airflow
           exit 1
+        
+      - name: Install Python dependencies in Airflow container
+        run: docker compose exec --user airflow airflow pip install -r /opt/project/requirements.txt
