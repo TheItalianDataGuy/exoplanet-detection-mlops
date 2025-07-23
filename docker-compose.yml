@@ -84,16 +84,20 @@ services:
         export AIRFLOW_WWW_USER_ROLE=${AIRFLOW_WWW_USER_ROLE} &&
         export AIRFLOW_WWW_USER_EMAIL=${AIRFLOW_WWW_USER_EMAIL} &&
         export AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_WWW_USER_PASSWORD} &&
+        
         airflow db upgrade &&
+        
         airflow users create \
           --username $AIRFLOW_WWW_USER_USERNAME \
           --firstname $AIRFLOW_WWW_USER_FIRSTNAME \
           --lastname $AIRFLOW_WWW_USER_LASTNAME \
           --role $AIRFLOW_WWW_USER_ROLE \
           --email $AIRFLOW_WWW_USER_EMAIL \
-          --password $AIRFLOW_WWW_USER_PASSWORD &&
+          --password $AIRFLOW_WWW_USER_PASSWORD || true &&
+        
         airflow scheduler &
-        airflow webserver
+
+        exec airflow webserver
       "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
