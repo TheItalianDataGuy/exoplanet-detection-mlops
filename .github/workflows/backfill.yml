@@ -49,7 +49,7 @@ jobs:
 
       - name: Install Python dependencies in Airflow (optional, in case your DAG uses packages not pre-installed)
         run: |
-          docker compose exec --user airflow airflow python3 -m pip install --user -r /opt/project/requirements.txt
+          docker compose exec --user airflow airflow pip install -r /opt/project/requirements.txt
 
       - name: List available DAGs
         run: docker compose exec airflow airflow dags list
