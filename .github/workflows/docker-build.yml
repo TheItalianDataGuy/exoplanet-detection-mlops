@@ -24,6 +24,12 @@ jobs:
 
       - name: Copy CI environment file
         run: cp .github/workflows/.env.ci .env
+    
+      - name: Fix Airflow logs permission
+        run: |
+          sudo rm -rf ./airflow/logs
+          mkdir -p ./airflow/logs
+          chmod -R 777 ./airflow/logs
 
       - name: Build all services with Docker Compose
         run: docker compose build
@@ -51,14 +57,21 @@ jobs:
       - name: Wait and check MLflow UI health
         run: |
           for i in {1..20}; do
-            curl --fail http://localhost:5001 && exit 0
-            echo "MLflow not up yet. Retrying in 3s..."
+            curl --fail http://mlops-mlflow:5000 && exit 0
+            echo "MLflow not up yet. Retrying in 5s..."
             sleep 5
           done
-          echo "MLflow failed to start"
           echo "MLflow failed to start"
           docker compose logs mlflow
           exit 1
 
       - name: Check Airflow health (optional login required)
-        run: curl --fail http://localhost:8080/health || echo "Airflow health check may require auth"
+        run: |
+          for i in {1..15}; do
+            curl --fail http://localhost:8080/health && exit 0
+            echo "Airflow not ready, retrying..."
+            sleep 5
+          done
+          echo "Airflow failed to become healthy. Showing logs."
+          docker compose logs airflow
+          exit 1

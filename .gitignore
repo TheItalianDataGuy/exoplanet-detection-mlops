@@ -227,3 +227,9 @@ airflow/unittests.cfg
 
 # __pycache__ folders (Python bytecode)
 **/__pycache__/
+*.pyc
+*.pyo
+*.db
+.env
+*.log
+logs/

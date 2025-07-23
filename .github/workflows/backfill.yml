@@ -31,7 +31,7 @@ jobs:
         run: |
           docker compose build
           docker compose up -d
-          sleep 45  # wait for Airflow to fully boot
+          sleep 45
 
       - name: Check Airflow health
         run: |
@@ -44,6 +44,8 @@ jobs:
           docker compose logs airflow
           exit 1
 
+      - name: List available DAGs
+        run: docker compose run --rm airflow airflow dags list
+
       - name: Trigger DAG backfill
-        run: |
-          docker compose exec airflow airflow dags backfill -s $(date +%F) ml_pipeline_dag
+        run: docker compose run --rm airflow airflow dags backfill -s $(date +%F) ml_pipeline_dag
