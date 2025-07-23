@@ -87,4 +87,4 @@ jobs:
           exit 1
         
       - name: Install Python dependencies in Airflow container
-        run: docker compose exec --user airflow airflow pip install -r /opt/project/requirements.txt
+        run: docker compose exec --user airflow airflow python3 -m pip install --user -r /opt/project/requirements.txt
