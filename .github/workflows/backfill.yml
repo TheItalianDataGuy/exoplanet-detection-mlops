@@ -7,6 +7,9 @@ on:
       - '.github/workflows/backfill.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   backfill-dag:
     runs-on: ubuntu-latest
@@ -20,7 +23,7 @@ jobs:
 
       - name: Copy CI environment file
         run: cp .github/workflows/.env.ci .env
-      
+
       - name: Fix Airflow logs permission
         run: |
           sudo rm -rf ./airflow/logs
@@ -44,8 +47,13 @@ jobs:
           docker compose logs airflow
           exit 1
 
+      - name: Install Python dependencies in Airflow (optional, in case your DAG uses packages not pre-installed)
+        run: |
+          docker compose exec airflow pip install -r /opt/project/requirements.txt
+
       - name: List available DAGs
-        run: docker compose run --rm airflow airflow dags list
+        run: docker compose exec airflow airflow dags list
 
       - name: Trigger DAG backfill
-        run: docker compose run --rm airflow airflow dags backfill -s $(date +%F) ml_pipeline_dag
+        run: |
+          docker compose exec airflow airflow dags backfill -s $(date +%F) ml_pipeline_dag

@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-validate:
     runs-on: ubuntu-latest
@@ -24,12 +27,19 @@ jobs:
 
       - name: Copy CI environment file
         run: cp .github/workflows/.env.ci .env
-    
+
       - name: Fix Airflow logs permission
         run: |
           sudo rm -rf ./airflow/logs
           mkdir -p ./airflow/logs
           chmod -R 777 ./airflow/logs
+
+      - name: Create MLflow folders and set permissions
+        run: |
+          mkdir -p ./mlflow
+          mkdir -p ./mlartifacts
+          touch ./mlflow/mlflow.db
+          chmod -R 777 ./mlflow ./mlartifacts
 
       - name: Build all services with Docker Compose
         run: docker compose build
@@ -57,7 +67,7 @@ jobs:
       - name: Wait and check MLflow UI health
         run: |
           for i in {1..20}; do
-            curl --fail http://mlops-mlflow:5000 && exit 0
+            curl --fail http://localhost:5001 && exit 0
             echo "MLflow not up yet. Retrying in 5s..."
             sleep 5
           done
