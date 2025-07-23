@@ -42,8 +42,6 @@ jobs:
             sleep 3
           done
           echo "FastAPI failed to start"
-          echo "MLflow failed to start"
-          docker compose logs mlflow
           exit 1
 
       - name: Show FastAPI logs if failed
@@ -58,6 +56,8 @@ jobs:
             sleep 5
           done
           echo "MLflow failed to start"
+          echo "MLflow failed to start"
+          docker compose logs mlflow
           exit 1
 
       - name: Check Airflow health (optional login required)
