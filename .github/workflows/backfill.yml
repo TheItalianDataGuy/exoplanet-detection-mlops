@@ -29,12 +29,13 @@ jobs:
 
       - name: Check Airflow health
         run: |
-          for i in {1..10}; do
+          for i in {1..15}; do
             curl --fail http://localhost:8080/health && exit 0
             echo "Airflow not ready, retrying..."
             sleep 5
           done
-          echo "Airflow failed to become healthy"
+          echo "Airflow failed to become healthy. Showing logs."
+          docker compose logs airflow
           exit 1
 
       - name: Trigger DAG backfill
