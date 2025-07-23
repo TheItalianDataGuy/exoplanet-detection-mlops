@@ -20,6 +20,12 @@ jobs:
 
       - name: Copy CI environment file
         run: cp .github/workflows/.env.ci .env
+      
+      - name: Fix Airflow logs permission
+        run: |
+          sudo rm -rf ./airflow/logs
+          mkdir -p ./airflow/logs
+          chmod -R 777 ./airflow/logs
 
       - name: Build and start containers
         run: |

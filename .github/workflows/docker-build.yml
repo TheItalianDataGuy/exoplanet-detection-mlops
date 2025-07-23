@@ -50,10 +50,10 @@ jobs:
 
       - name: Wait and check MLflow UI health
         run: |
-          for i in {1..10}; do
-            curl --fail http://localhost:5000 && exit 0
+          for i in {1..20}; do
+            curl --fail http://localhost:5001 && exit 0
             echo "MLflow not up yet. Retrying in 3s..."
-            sleep 3
+            sleep 5
           done
           echo "MLflow failed to start"
           exit 1
