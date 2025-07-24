@@ -56,4 +56,8 @@ jobs:
 
       - name: Trigger DAG backfill
         run: |
-          docker compose exec airflow airflow dags backfill ml_pipeline_dag
+          docker compose exec airflow airflow dags trigger ml_pipeline_dag --run-id github-trigger-$(date +%s)
+      
+      - name: List DAG runs
+        run: |
+          docker compose exec airflow airflow dags list-runs -d ml_pipeline_dag
